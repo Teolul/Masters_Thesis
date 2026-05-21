@@ -71,20 +71,18 @@ def load_test_csv(path):
     return X.T
 
 
-def apply_pca(y_tr, y_val, n_components=10, kernel=None, gamma=1e-2, alpha=0.1, degree=3):
+def apply_pca(y_tr, n_components=10, kernel=None, gamma=1e-2, alpha=0.1, degree=3):
     """
     Apply PCA or KernelPCA to each function separately, retaining n_components components.
     - y_tr: training outputs of shape (n_samples, n_functions, n_wavelengths)
-    - y_val: validation outputs of shape (n_samples, n_functions, n_wavelengths)
     - n_components: number of PCA components to retain
     - kernel: if None, use regular PCA, otherwise specify the kernel type for KernelPCA (e.g., 'rbf', 'poly', etc.)
     - returns: list of PCA objects, list of transformed training outputs, list of transformed validation outputs
     """
 
-    print(f"========== Applying {'KernelPCA' if kernel is not None else 'PCA'} with n_components={n_components} to each function separately... ==========")
+    print(f"---------- Applying {'KernelPCA' if kernel is not None else 'PCA'} with n_components={n_components} to each function separately... ----------")
     pca_list = []
     y_tr_pca_list = []
-    y_val_pca_list = []
 
     for i in range(globals.N_FUNCTIONS):
         if kernel is not None:
@@ -93,14 +91,11 @@ def apply_pca(y_tr, y_val, n_components=10, kernel=None, gamma=1e-2, alpha=0.1, 
             pca = PCA(n_components=n_components)
         
         y_tr_i = y_tr[:, i, :] # shape of function: (n_samples, n_wavelengths)
-        y_val_i = y_val[:, i, :]
         
         y_tr_pca = pca.fit_transform(y_tr_i)     # fit training here
-        y_val_pca = pca.transform(y_val_i)       # just transform validation to avoid information leak
         
         pca_list.append(pca)
         y_tr_pca_list.append(y_tr_pca)
-        y_val_pca_list.append(y_val_pca)
 
     # print amount of explained variance and number of components for each function
     total_explained_variance = 0
@@ -116,9 +111,9 @@ def apply_pca(y_tr, y_val, n_components=10, kernel=None, gamma=1e-2, alpha=0.1, 
 
         print(f"  Total explained variance = {total_explained_variance:.4f}")
 
-    print("========== PCA application completed. ==========\n")
+    print("---------- PCA application completed. ----------\n")
 
-    return pca_list, y_tr_pca_list, y_val_pca_list
+    return pca_list, y_tr_pca_list
 
 
 def scale_data(x_tr, x_val, y_tr_red_list, scale_type="standard"):
@@ -127,7 +122,7 @@ def scale_data(x_tr, x_val, y_tr_red_list, scale_type="standard"):
     - inputs: training inputs, validation inputs, list of PCA-transformed training outputs, scaling type
     - outputs: scaled training inputs, scaled validation inputs, list of scaled PCA-transformed training outputs, list of scalers used for each output function
     """
-    print(f"========== Scaling data using {scale_type} scaling... ==========")
+    print(f"---------- Scaling data using {scale_type} scaling... ----------")
     scaler = StandardScaler() if scale_type == "standard" else MinMaxScaler()
 
     # standard scaling
@@ -143,7 +138,7 @@ def scale_data(x_tr, x_val, y_tr_red_list, scale_type="standard"):
         y_scalers.append(scaler)
         y_tr_reduced_scaled_list.append(y_scaled)
 
-    print("========== Scaling completed. ==========\n")
+    print("---------- Scaling completed. ----------\n")
 
     return x_tr_scaled, x_val_scaled, y_tr_reduced_scaled_list, y_scalers
 
@@ -256,7 +251,7 @@ def load_csv_last_id(path):
     if Path(path).exists():
         results_df = pd.read_csv(path)
         last_id = results_df["id"].max()
-        if last_id is np.nan:
+        if pd.isna(last_id):
             last_id = 0
     else:
         last_id = 0
