@@ -89,10 +89,11 @@ def load_csv_last_id(path):
     return last_id
 
 
-def apply_pca(y_tr, n_components=10, kernel=None, gamma=1e-2, alpha=0.1, degree=3):
+def apply_pca(y_tr, y_val, n_components=10, kernel=None, gamma=1e-2, alpha=0.1, degree=3):
     """
     Apply PCA or KernelPCA to each function separately, retaining n_components components.
     - y_tr: training outputs of shape (n_samples, n_functions, n_wavelengths)
+    - y_val: validation outputs of shape (n_samples, n_functions, n_wavelengths)
     - n_components: number of PCA components to retain
     - kernel: if None, use regular PCA, otherwise specify the kernel type for KernelPCA (e.g., 'rbf', 'poly', etc.)
     - returns: list of PCA objects, list of transformed training outputs, list of transformed validation outputs
@@ -101,6 +102,7 @@ def apply_pca(y_tr, n_components=10, kernel=None, gamma=1e-2, alpha=0.1, degree=
     print(f"---------- Applying {'KernelPCA' if kernel is not None else 'PCA'} with n_components={n_components} to each function separately... ----------")
     pca_list = []
     y_tr_pca_list = []
+    y_val_pca_list = []
 
     for i in range(globals.N_FUNCTIONS):
         if kernel is not None:
@@ -109,11 +111,14 @@ def apply_pca(y_tr, n_components=10, kernel=None, gamma=1e-2, alpha=0.1, degree=
             pca = PCA(n_components=n_components)
         
         y_tr_i = y_tr[:, i, :] # shape of function: (n_samples, n_wavelengths)
+        y_val_i = y_val[:, i, :]
         
         y_tr_pca = pca.fit_transform(y_tr_i)     # fit training here
+        y_val_pca = pca.transform(y_val_i)       # transform validation with the same PCA fitted on training
         
         pca_list.append(pca)
         y_tr_pca_list.append(y_tr_pca)
+        y_val_pca_list.append(y_val_pca)
 
     # print amount of explained variance and number of components for each function
     total_explained_variance = 0
@@ -131,7 +136,7 @@ def apply_pca(y_tr, n_components=10, kernel=None, gamma=1e-2, alpha=0.1, degree=
 
     print("---------- PCA application completed. ----------\n")
 
-    return pca_list, y_tr_pca_list
+    return pca_list, y_tr_pca_list, y_val_pca_list
 
 
 def scale_input_data(x_tr, x_val, scale_type="standard"):
@@ -152,7 +157,7 @@ def scale_input_data(x_tr, x_val, scale_type="standard"):
     return x_tr_scaled, x_val_scaled, scaler
 
 
-def scale_output_data(y_tr_red_list, scale_type="standard"):
+def scale_output_data(y_tr_red_list, y_val_red_list, scale_type="standard"):
     """
     Scale the output data using the provided scalers
     - inputs: list of PCA-transformed training outputs, list of PCA-transformed validation outputs, list of scalers used for each output function
@@ -162,15 +167,18 @@ def scale_output_data(y_tr_red_list, scale_type="standard"):
 
     y_scalers = []
     y_tr_reduced_scaled_list = []
+    y_val_reduced_scaled_list = []
     for i in range(globals.N_FUNCTIONS):
         scaler = StandardScaler() if scale_type == "standard" else MinMaxScaler()
-        y_scaled = scaler.fit_transform(y_tr_red_list[i])
+        y_tr_scaled = scaler.fit_transform(y_tr_red_list[i])
+        y_val_scaled = scaler.transform(y_val_red_list[i])
         y_scalers.append(scaler)
-        y_tr_reduced_scaled_list.append(y_scaled)
+        y_tr_reduced_scaled_list.append(y_tr_scaled)
+        y_val_reduced_scaled_list.append(y_val_scaled)
 
     print("---------- Output data scaling completed. ----------\n")
 
-    return y_tr_reduced_scaled_list, y_scalers
+    return y_tr_reduced_scaled_list, y_val_reduced_scaled_list, y_scalers
 
 
 def build_mask(wavelengths):
