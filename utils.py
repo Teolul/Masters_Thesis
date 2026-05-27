@@ -50,7 +50,7 @@ def load_train_h5(path):
     """
     Load a training .h5 file
     - inputs: path to the .h5 file
-    - outputs: numpy array X (inputs) of shape (n_samples, n_features), numpy array Y (outputs) of shape (n_samples, n_outputs), numpy array wvl (wavelengths)
+    - outputs: numpy array X (inputs) of shape (n_samples, n_features), numpy array Y (outputs) of shape (n_samples, n_features), numpy array wvl (wavelengths)
     """
     with h5py.File(path, "r") as f:
         Y = f["LUTdata"][:]      # outputs
@@ -75,7 +75,7 @@ def load_csv_last_id(path):
     """
     Load a CSV file and return the last id used for logging results
     - inputs: path to the CSV file
-    - outputs: last id used in the CSV file, or 1 if the file does not exist or is empty
+    - outputs: last id used in the CSV file, or 0 if the file does not exist or is empty
     """
 
     if Path(path).exists():
@@ -109,21 +109,18 @@ def apply_pca(y_tr, y_val, n_components=10, kernel=None, gamma=1e-2, alpha=0.1, 
             pca = KernelPCA(n_components=n_components, kernel=kernel, gamma=gamma, fit_inverse_transform=True, alpha=alpha, degree=degree)
         else:
             pca = PCA(n_components=n_components)
-        
-        y_tr_i = y_tr[:, i, :] # shape of function: (n_samples, n_wavelengths)
-        y_val_i = y_val[:, i, :]
-        
-        y_tr_pca = pca.fit_transform(y_tr_i)     # fit training here
-        y_val_pca = pca.transform(y_val_i)       # transform validation with the same PCA fitted on training
+            
+        # shape of single function: (n_samples, n_wavelengths)
+        y_tr_pca = pca.fit_transform(y_tr[:, i, :])     # fit training here
+        y_val_pca = pca.transform(y_val[:, i, :])       # transform validation with the same PCA fitted on training
         
         pca_list.append(pca)
         y_tr_pca_list.append(y_tr_pca)
         y_val_pca_list.append(y_val_pca)
 
     # print amount of explained variance and number of components for each function
-    total_explained_variance = 0
-
     if kernel is None:
+        total_explained_variance = 0
         print("  Regular PCA used, displaying results:")
         for i, pca in enumerate(pca_list):
             explained_variance = pca.explained_variance_ratio_.sum()
@@ -142,8 +139,8 @@ def apply_pca(y_tr, y_val, n_components=10, kernel=None, gamma=1e-2, alpha=0.1, 
 def scale_input_data(x_tr, x_val, scale_type="standard"):
     """
     Scale the data using either standard scaling or min-max scaling
-    - inputs: training inputs, validation inputs, list of PCA-transformed training outputs, scaling type
-    - outputs: scaled training inputs, scaled validation inputs, list of scaled PCA-transformed training outputs, list of scalers used for each output function
+    - inputs: training inputs, validation inputs, scaling type
+    - outputs: scaler, scaled training inputs, scaled validation inputs
     """
     print(f"---------- Scaling input data using {scale_type} scaling... ----------")
 
@@ -154,31 +151,31 @@ def scale_input_data(x_tr, x_val, scale_type="standard"):
 
     print("---------- Input data scaling completed. ----------\n")
 
-    return x_tr_scaled, x_val_scaled, scaler
+    return scaler, x_tr_scaled, x_val_scaled
 
 
-def scale_output_data(y_tr_red_list, y_val_red_list, scale_type="standard"):
+def scale_output_data(y_tr_list, y_val_list, scale_type="standard"):
     """
     Scale the output data using the provided scalers
-    - inputs: list of PCA-transformed training outputs, list of PCA-transformed validation outputs, list of scalers used for each output function
-    - outputs: list of scaled PCA-transformed training outputs, list of scaled PCA-transformed validation outputs
+    - inputs: list of training outputs, list of validation outputs, scaling type
+    - outputs: list of scalers used for each output function, list of scaled training outputs, list of scaled validation outputs
     """
     print(f"---------- Scaling output data using {scale_type} scaling... ----------")
 
     y_scalers = []
-    y_tr_reduced_scaled_list = []
-    y_val_reduced_scaled_list = []
+    y_tr_scaled_list = []
+    y_val_scaled_list = []
     for i in range(globals.N_FUNCTIONS):
         scaler = StandardScaler() if scale_type == "standard" else MinMaxScaler()
-        y_tr_scaled = scaler.fit_transform(y_tr_red_list[i])
-        y_val_scaled = scaler.transform(y_val_red_list[i])
+        y_tr_scaled = scaler.fit_transform(y_tr_list[i])
+        y_val_scaled = scaler.transform(y_val_list[i])
         y_scalers.append(scaler)
-        y_tr_reduced_scaled_list.append(y_tr_scaled)
-        y_val_reduced_scaled_list.append(y_val_scaled)
+        y_tr_scaled_list.append(y_tr_scaled)
+        y_val_scaled_list.append(y_val_scaled)
 
     print("---------- Output data scaling completed. ----------\n")
 
-    return y_tr_reduced_scaled_list, y_val_reduced_scaled_list, y_scalers
+    return y_scalers, y_tr_scaled_list, y_val_scaled_list
 
 
 def build_mask(wavelengths):
@@ -187,7 +184,7 @@ def build_mask(wavelengths):
     - inputs: numpy array of wavelengths
     - outputs: boolean mask where True indicates wavelengths to include in evaluation
     """
-    # wavelengths to exclude from MRE calculation: 931-945 nm, 1100-1160 nm, 1300-1500 nm, 1750-1980 nm, and >2420 nm
+    # wavelengths to exclude from error calculation: 931-945 nm, 1100-1160 nm, 1300-1500 nm, 1750-1980 nm, and >2420 nm
     mask = (
         ((wavelengths < 931) | (wavelengths > 945)) &
         ((wavelengths < 1100) | (wavelengths > 1160)) &
@@ -201,7 +198,7 @@ def build_mask(wavelengths):
 def mre_score(y_true, y_pred, wavelengths, axis=None, epsilon=1e-8):
     """
     Mean Relative Error (MRE) metric
-    - inputs: y_true (true values), y_pred (predicted values), wavelengths (wavelength values), epsilon (small constant to avoid division by zero)
+    - inputs: true values, predicted values, wavelengths, axis on which to compute the metric, epsilon (small constant to avoid division by zero)
     - output: MRE score, either as a global scalar or as an array depending on the axis parameter
 
     axis options:
@@ -210,7 +207,6 @@ def mre_score(y_true, y_pred, wavelengths, axis=None, epsilon=1e-8):
         1    -> per wavelength
         0    -> per function and per wavelength
     """
-    # standard value of epsilon is 1e-8, since lower values lead to very high MRE due to division by small numbers, while higher values get more stable MRE estimates
     
     mask = build_mask(wavelengths)
 
@@ -242,7 +238,7 @@ def mre_score(y_true, y_pred, wavelengths, axis=None, epsilon=1e-8):
 def mae_score(y_true, y_pred, wavelengths, axis=None):
     """
     Mean Absolute Error (MAE) metric
-    - inputs: y_true (true values), y_pred (predicted values), wavelengths (wavelength values)
+    - inputs: true values, predicted values, wavelengths, axis on which to compute the metric
     - output: MAE score, either as a global scalar or as an array depending on the axis parameter
 
     axis options:
@@ -279,15 +275,15 @@ def mae_score(y_true, y_pred, wavelengths, axis=None):
     return mae
 
 
-def calculate_coverage(y_true, y_pred, y_std, sigma=2):
+def calculate_coverage(y_true, y_pred, y_std, n_std=2):
     """
     Calculates the percentage of true values falling within the GP uncertainty bands.
-    - inputs: y_true (true values), y_pred (predicted mean), y_std (predicted standard deviation), sigma (number of standard deviations for the confidence interval)
+    - inputs: true values, predicted values, predicted standard deviation, n_std (number of standard deviations for the confidence interval)
     - outputs: global coverage percentage, coverage percentage per function
     """
     # define bounds: (n_samples, n_functions, n_wavelengths)
-    lower_bound = y_pred - sigma * y_std
-    upper_bound = y_pred + sigma * y_std
+    lower_bound = y_pred - n_std * y_std
+    upper_bound = y_pred + n_std * y_std
 
     # boolean mask: True if the value is within the interval
     is_inside = (y_true >= lower_bound) & (y_true <= upper_bound)
