@@ -101,8 +101,8 @@ def apply_pca(y_tr, y_val, n_components=10, kernel=None, gamma=1e-2, alpha=0.1, 
 
     print(f"---------- Applying {'KernelPCA' if kernel is not None else 'PCA'} with n_components={n_components} to each function separately... ----------")
     pca_list = []
-    y_tr_pca_list = []
-    y_val_pca_list = []
+    y_tr_pca = np.zeros((y_tr.shape[0], y_tr.shape[1], n_components))
+    y_val_pca = np.zeros((y_val.shape[0], y_val.shape[1], n_components))
 
     for i in range(globals.N_FUNCTIONS):
         if kernel is not None:
@@ -110,13 +110,9 @@ def apply_pca(y_tr, y_val, n_components=10, kernel=None, gamma=1e-2, alpha=0.1, 
         else:
             pca = PCA(n_components=n_components)
             
-        # shape of single function: (n_samples, n_wavelengths)
-        y_tr_pca = pca.fit_transform(y_tr[:, i, :])     # fit training here
-        y_val_pca = pca.transform(y_val[:, i, :])       # transform validation with the same PCA fitted on training
-        
+        y_tr_pca[:, i, :] = pca.fit_transform(y_tr[:, i, :]) # fit training here
+        y_val_pca[:, i, :] = pca.transform(y_val[:, i, :]) # transform validation with the same PCA fitted on training
         pca_list.append(pca)
-        y_tr_pca_list.append(y_tr_pca)
-        y_val_pca_list.append(y_val_pca)
 
     # print amount of explained variance and number of components for each function
     if kernel is None:
@@ -133,7 +129,7 @@ def apply_pca(y_tr, y_val, n_components=10, kernel=None, gamma=1e-2, alpha=0.1, 
 
     print("---------- PCA application completed. ----------\n")
 
-    return pca_list, y_tr_pca_list, y_val_pca_list
+    return pca_list, y_tr_pca, y_val_pca
 
 
 def scale_input_data(x_tr, x_val, scale_type="standard"):
@@ -154,28 +150,26 @@ def scale_input_data(x_tr, x_val, scale_type="standard"):
     return scaler, x_tr_scaled, x_val_scaled
 
 
-def scale_output_data(y_tr_list, y_val_list, scale_type="standard"):
+def scale_output_data(y_tr, y_val, scale_type="standard"):
     """
     Scale the output data using the provided scalers
-    - inputs: list of training outputs, list of validation outputs, scaling type
-    - outputs: list of scalers used for each output function, list of scaled training outputs, list of scaled validation outputs
+    - inputs: training outputs of shape (n_samples, n_functions, n_wavelengths), validation outputs of shape (n_samples, n_functions, n_wavelengths), scaling type
+    - outputs: list of scalers used for each output function, scaled training outputs of shape (n_samples, n_functions, n_wavelengths), scaled validation outputs of shape (n_samples, n_functions, n_wavelengths)
     """
     print(f"---------- Scaling output data using {scale_type} scaling... ----------")
 
     y_scalers = []
-    y_tr_scaled_list = []
-    y_val_scaled_list = []
+    y_tr_scaled = np.zeros_like(y_tr)
+    y_val_scaled = np.zeros_like(y_val)
     for i in range(globals.N_FUNCTIONS):
         scaler = StandardScaler() if scale_type == "standard" else MinMaxScaler()
-        y_tr_scaled = scaler.fit_transform(y_tr_list[i])
-        y_val_scaled = scaler.transform(y_val_list[i])
+        y_tr_scaled[:, i, :] = scaler.fit_transform(y_tr[:, i, :])
+        y_val_scaled[:, i, :] = scaler.transform(y_val[:, i, :])
         y_scalers.append(scaler)
-        y_tr_scaled_list.append(y_tr_scaled)
-        y_val_scaled_list.append(y_val_scaled)
 
     print("---------- Output data scaling completed. ----------\n")
 
-    return y_scalers, y_tr_scaled_list, y_val_scaled_list
+    return y_scalers, y_tr_scaled, y_val_scaled
 
 
 def build_mask(wavelengths):
