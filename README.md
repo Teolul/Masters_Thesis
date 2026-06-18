@@ -17,3 +17,6 @@ The following are the hardware specifications of the main computer used to run t
 
 ### Thesis Reference
 Thesis is in progress.
+
+### Bibliography
+Bibliography is in progress.
