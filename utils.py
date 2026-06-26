@@ -1,13 +1,10 @@
 from pathlib import Path
-import time
-import copy
 import h5py
 import pandas as pd
 import numpy as np
+from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA, KernelPCA
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C, WhiteKernel
-from sklearn.gaussian_process import GaussianProcessRegressor
 
 import globals
 
@@ -87,6 +84,37 @@ def load_csv_last_id(path):
         last_id = 0
 
     return last_id
+
+
+def train_val_test_split(X, Y, wavelengths, verbose=True):
+    """
+    Perform train, validation and test splits on given data.
+    - X: inputs of shape (n_samples, n_inputs)
+    - Y: outputs of shape (n_samples, n_functions, n_wavelengths)
+    - wavelengths: numpy array of wavelengths
+    - verbose: print additional info or not
+    - returns: training, validation and test inputs and outputs
+    """
+    # first split: train (80%) and temp (20%)
+    X_tr, X_temp, Y_tr, Y_temp = train_test_split(X, Y, test_size=0.2, shuffle=True, random_state=42)
+
+    # second split: validation (10%) and test (10%)
+    X_val, X_test, Y_val, Y_test = train_test_split(X_temp, Y_temp, test_size=0.5, shuffle=True, random_state=42)
+
+    if verbose:
+        print("X shape:", X.shape)
+        print("Y shape:", Y.shape)
+        print("wavelengths shape:", wavelengths.shape)
+        print()
+        print("X_tr shape:", X_tr.shape)
+        print("X_val shape:", X_val.shape)
+        print("X_test shape:", X_test.shape)
+        print()
+        print("Y_tr shape:", Y_tr.shape)
+        print("Y_val shape:", Y_val.shape)
+        print("Y_test shape:", Y_test.shape)
+    
+    return X_tr, X_val, X_test, Y_tr, Y_val, Y_test
 
 
 def apply_pca(y_tr, y_val, n_components=10, kernel=None, gamma=1e-2, alpha=0.1, degree=3):
