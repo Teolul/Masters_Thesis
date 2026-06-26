@@ -1,32 +1,19 @@
 from pathlib import Path
+import time
+import copy
 import h5py
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA, KernelPCA
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C, WhiteKernel
+from sklearn.gaussian_process import GaussianProcessRegressor
 
 import globals
 
 # ----------------------------
 # Utilities for loading data, preprocessing, and evaluation
 # ----------------------------
-
-
-def make_scaler(scale_type="standard"):
-    """
-    Create a scaler using either standard scaling or min-max scaling
-    - inputs: scaling type
-    - outputs: scaler object
-    """
-    scale_type = scale_type.lower()
-
-    if scale_type == "standard":
-        return StandardScaler()
-    if scale_type in ("minmax", "min-max"):
-        return MinMaxScaler()
-
-    raise ValueError("Invalid scale_type. Must be 'standard' or 'minmax'.")
 
 
 def inspect_metadata(path):
@@ -102,32 +89,6 @@ def load_csv_last_id(path):
     return last_id
 
 
-def train_val_test_split(X, Y, wavelengths, verbose=True):
-    wavelengths = wavelengths.squeeze()
-    Y_resh = Y.reshape(-1, Y.shape[1] // len(wavelengths), len(wavelengths))
-
-    # first split: train (80%) and temp (20%)
-    X_tr, X_temp, Y_tr, Y_temp = train_test_split(X, Y_resh, test_size=0.2, shuffle=True, random_state=42)
-
-    # second split: validation (10%) and test (10%)
-    X_val, X_test, Y_val, Y_test = train_test_split(X_temp, Y_temp, test_size=0.5, shuffle=True, random_state=42)
-
-    if verbose:
-        print("X shape:", X.shape)
-        print("Y shape:", Y.shape)
-        print("wavelengths shape:", wavelengths.shape)
-        print()
-        print("X_tr shape:", X_tr.shape)
-        print("X_val shape:", X_val.shape)
-        print("X_test shape:", X_test.shape)
-        print()
-        print("Y_tr shape:", Y_tr.shape)
-        print("Y_val shape:", Y_val.shape)
-        print("Y_test shape:", Y_test.shape)
-    
-    return X_tr, X_val, X_test, Y_tr, Y_val, Y_test
-
-
 def apply_pca(y_tr, y_val, n_components=10, kernel=None, gamma=1e-2, alpha=0.1, degree=3):
     """
     Apply PCA or KernelPCA to each function separately, retaining n_components components.
@@ -179,7 +140,7 @@ def scale_input_data(x_tr, x_val, scale_type="standard"):
     """
     print(f"---------- Scaling input data using {scale_type} scaling... ----------")
 
-    scaler = make_scaler(scale_type)
+    scaler = StandardScaler() if scale_type == "standard" else MinMaxScaler()
     x_scaler = scaler.fit(x_tr)
     x_tr_scaled = x_scaler.transform(x_tr)
     x_val_scaled = x_scaler.transform(x_val)
@@ -201,7 +162,7 @@ def scale_output_data(y_tr, y_val, scale_type="standard"):
     y_tr_scaled = np.zeros_like(y_tr)
     y_val_scaled = np.zeros_like(y_val)
     for i in range(globals.N_FUNCTIONS):
-        scaler = make_scaler(scale_type)
+        scaler = StandardScaler() if scale_type == "standard" else MinMaxScaler()
         y_tr_scaled[:, i, :] = scaler.fit_transform(y_tr[:, i, :])
         y_val_scaled[:, i, :] = scaler.transform(y_val[:, i, :])
         y_scalers.append(scaler)
@@ -217,8 +178,6 @@ def build_mask(wavelengths):
     - inputs: numpy array of wavelengths
     - outputs: boolean mask where True indicates wavelengths to include in evaluation
     """
-    wavelengths = np.asarray(wavelengths).squeeze()
-
     # wavelengths to exclude from error calculation: 931-945 nm, 1100-1160 nm, 1300-1500 nm, 1750-1980 nm, and >2420 nm
     mask = (
         ((wavelengths < 931) | (wavelengths > 945)) &
@@ -228,28 +187,6 @@ def build_mask(wavelengths):
         (wavelengths < 2420)
     )
     return mask
-
-
-def _reduce_metric(error, wavelengths, axis=None):
-    """
-    Reduce a metric error array using the same axis options used by MRE and MAE.
-    """
-    mask = build_mask(wavelengths)
-    if mask.ndim != 1 or mask.shape[0] != error.shape[-1]:
-        raise ValueError(
-            "wavelengths must contain one value for each wavelength in y_true/y_pred."
-        )
-
-    if axis is None:
-        return np.mean(error[:, :, mask])
-    if axis == 2:
-        return np.mean(error[:, :, mask], axis=(0, 2))
-    if axis == 1:
-        return np.mean(error, axis=(0, 1))
-    if axis == 0:
-        return np.mean(error, axis=0)
-
-    raise ValueError("Invalid axis value. Must be None, 0, 1, or 2.")
 
 
 def mre_score(y_true, y_pred, wavelengths, axis=None, epsilon=1e-8):
@@ -264,8 +201,32 @@ def mre_score(y_true, y_pred, wavelengths, axis=None, epsilon=1e-8):
         1    -> per wavelength
         0    -> per function and per wavelength
     """
-    error = np.abs(y_pred - y_true) / (np.abs(y_true) + epsilon)
-    return _reduce_metric(error, wavelengths, axis=axis)
+    
+    mask = build_mask(wavelengths)
+
+    if axis is None:
+        mre = np.mean(
+            np.abs(y_pred[:, :, mask] - y_true[:, :, mask]) / (np.abs(y_true[:, :, mask]) + epsilon)
+        )
+    elif axis == 2:
+        mre = np.mean(
+            np.abs(y_pred[:, :, mask] - y_true[:, :, mask]) / (np.abs(y_true[:, :, mask]) + epsilon),
+            axis=(0, 2)
+        )
+    elif axis == 1:
+        mre = np.mean(
+            np.abs(y_pred - y_true) / (np.abs(y_true) + epsilon),
+            axis=(0, 1)
+        )
+    elif axis == 0:
+        mre = np.mean(
+            np.abs(y_pred - y_true) / (np.abs(y_true) + epsilon),
+            axis=0
+        )
+    else:
+        raise ValueError("Invalid axis value. Must be None, 0, 1, or 2.")
+    
+    return mre
 
 
 def mae_score(y_true, y_pred, wavelengths, axis=None):
@@ -280,8 +241,32 @@ def mae_score(y_true, y_pred, wavelengths, axis=None):
         1    -> per wavelength
         0    -> per function and per wavelength
     """
-    error = np.abs(y_pred - y_true)
-    return _reduce_metric(error, wavelengths, axis=axis)
+
+    mask = build_mask(wavelengths)
+
+    if axis is None:
+        mae = np.mean(
+            np.abs(y_pred[:, :, mask] - y_true[:, :, mask])
+        )
+    elif axis == 2:
+        mae = np.mean(
+            np.abs(y_pred[:, :, mask] - y_true[:, :, mask]),
+            axis=(0, 2)
+        )
+    elif axis == 1:
+        mae = np.mean(
+            np.abs(y_pred - y_true),
+            axis=(0, 1)
+        )
+    elif axis == 0:
+        mae = np.mean(
+            np.abs(y_pred - y_true),
+            axis=0
+        )
+    else:
+        raise ValueError("Invalid axis value. Must be None, 0, 1, or 2.")
+    
+    return mae
 
 
 def calculate_coverage(y_true, y_pred, y_std, n_std=2):
