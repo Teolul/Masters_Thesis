@@ -17,8 +17,16 @@ TEST_FILE_B_INTERP = ROOT / "scenarioB" / "reference" / "refInterp.csv"
 TEST_FILE_B_EXTRAP = ROOT / "scenarioB" / "reference" / "refExtrap.csv"
 
 # "current" selection (mutable state)
-CURRENT_TRAIN_FILE = TRAIN_FILE_A_10000
+CURRENT_TRAIN_FILE = TRAIN_FILE_A_500
 CURRENT_TEST_FILE = TEST_FILE_A_INTERP
 
 N_FUNCTIONS = 6
 N_INPUTS = 9
+
+# plotting info
+param_names_plots = ['Ozone (atm-cm)', 'Columnar Water Vapor (g/cm^2)', 'Aerosol Optical Depth (-)', 'Asymmetry Parameter (-)', 'Angstrom Exponent (-)',
+                     'Single Scattering Albedo (-)', 'Solar Zenith Angle (deg)', 'View Zenith Angle (deg)', 'Relative Azimuth Angle (deg)']
+param_names_plots_abb = ['O3', 'CWV', 'AOD', 'Asy. Param.', 'Ang. Exp.', 'SSA', 'SZA', 'VZA', 'RAA']
+
+function_names_plots = ['Path Radiance', 'Direct Solar Irradiance', 'Diffuse Solar Irradiance', 'Spherical Albedo', 'Direct Transmittance', 'Diffuse Transmittance']
+function_names_plots_abb = ['Path Rad.', 'Direct Irrad.', 'Diffuse Irrad.', 'Sph. Alb.', 'Direct Trans.', 'Diffuse Trans.']
