@@ -17,7 +17,7 @@ TEST_FILE_B_INTERP = ROOT / "scenarioB" / "reference" / "refInterp.csv"
 TEST_FILE_B_EXTRAP = ROOT / "scenarioB" / "reference" / "refExtrap.csv"
 
 # "current" selection (mutable state)
-CURRENT_TRAIN_FILE = TRAIN_FILE_A_10000
+CURRENT_TRAIN_FILE = TRAIN_FILE_A_500
 CURRENT_TEST_FILE = TEST_FILE_A_INTERP
 
 N_FUNCTIONS = 6

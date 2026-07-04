@@ -2,6 +2,7 @@ from pathlib import Path
 import h5py
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA, KernelPCA
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
@@ -117,43 +118,38 @@ def train_val_test_split(X, Y, wavelengths, verbose=True):
     return X_tr, X_val, X_test, Y_tr, Y_val, Y_test
 
 
-def apply_pca(y_tr, y_val, n_components=10, kernel=None, gamma=1e-2, alpha=0.1, degree=3):
+def apply_pca(y_tr, y_val, n_components=10):
     """
-    Apply PCA or KernelPCA to each function separately, retaining n_components components.
+    Apply PCA to each function separately, retaining n_components components.
     - y_tr: training outputs of shape (n_samples, n_functions, n_wavelengths)
     - y_val: validation outputs of shape (n_samples, n_functions, n_wavelengths)
     - n_components: number of PCA components to retain
-    - kernel: if None, use regular PCA, otherwise specify the kernel type for KernelPCA (e.g., 'rbf', 'poly', etc.)
     - returns: list of PCA objects, list of transformed training outputs, list of transformed validation outputs
     """
 
-    print(f"---------- Applying {'KernelPCA' if kernel is not None else 'PCA'} with n_components={n_components} to each function separately... ----------")
+    print(f"---------- Applying PCA with n_components={n_components} to each function separately... ----------")
     pca_list = []
     y_tr_pca = np.zeros((y_tr.shape[0], y_tr.shape[1], n_components))
     y_val_pca = np.zeros((y_val.shape[0], y_val.shape[1], n_components))
 
     for i in range(globals.N_FUNCTIONS):
-        if kernel is not None:
-            pca = KernelPCA(n_components=n_components, kernel=kernel, gamma=gamma, fit_inverse_transform=True, alpha=alpha, degree=degree)
-        else:
-            pca = PCA(n_components=n_components)
-            
+        pca = PCA(n_components=n_components)
+
         y_tr_pca[:, i, :] = pca.fit_transform(y_tr[:, i, :]) # fit training here
         y_val_pca[:, i, :] = pca.transform(y_val[:, i, :]) # transform validation with the same PCA fitted on training
         pca_list.append(pca)
 
     # print amount of explained variance and number of components for each function
-    if kernel is None:
-        total_explained_variance = 0
-        print("  Regular PCA used, displaying results:")
-        for i, pca in enumerate(pca_list):
-            explained_variance = pca.explained_variance_ratio_.sum()
-            total_explained_variance += explained_variance
-            print(f"  Function {i+1}: Explained variance = {explained_variance:.4f}")
-            print(f"  Number of components retained: {pca.n_components_}")
-            print()
+    total_explained_variance = 0
+    print("  Regular PCA used, displaying results:")
+    for i, pca in enumerate(pca_list):
+        explained_variance = pca.explained_variance_ratio_.sum()
+        total_explained_variance += explained_variance
+        print(f"  Function {i+1}: Explained variance = {explained_variance:.4f}")
+        print(f"  Number of components retained: {pca.n_components_}")
+        print()
 
-        print(f"  Total explained variance = {total_explained_variance:.4f}")
+    print(f"  Total explained variance = {total_explained_variance:.4f}")
 
     print("---------- PCA application completed. ----------\n")
 
@@ -318,3 +314,272 @@ def calculate_coverage(y_true, y_pred, y_std, n_std=2):
     per_function_coverage = np.mean(is_inside, axis=(0, 2)) * 100
 
     return global_coverage, per_function_coverage
+
+
+# ============================= PLOTTING UTILITIES =============================
+def show_fit_val_summary(results_df, save_path="nn_saves/nn_results_analysis.png"):
+    # ── average fit time per dataset size ────────────────────────────────────
+    avg_fit_time = (
+        results_df.groupby("dataset_size")["fit_time"]
+        .mean()
+        .rename("avg_fit_time")
+        .reset_index()
+    )
+    print("=" * 60)
+    print("Average Fit Time by Dataset Size")
+    print("=" * 60)
+    print(avg_fit_time.to_string(index=False))
+
+
+    # ── average best_val_mre per dataset size AND model ───────────────────────
+    avg_val_mre = (
+        results_df.groupby(["dataset_size", "model"])["best_val_mre"]
+        .mean()
+        .rename("avg_best_val_mre")
+        .reset_index()
+    )
+    print("\n" + "=" * 60)
+    print("Average Best Val MRE by Dataset Size & Model")
+    print("=" * 60)
+    print(avg_val_mre.to_string(index=False))
+
+
+    # ── average best_val_mae per dataset size AND model ───────────────────────
+    avg_val_mae = (
+        results_df.groupby(["dataset_size", "model"])["best_val_mae"]
+        .mean()
+        .rename("avg_best_val_mae")
+        .reset_index()
+    )
+    print("\n" + "=" * 60)
+    print("Average Best Val MAE by Dataset Size & Model")
+    print("=" * 60)
+    print(avg_val_mae.to_string(index=False))
+
+
+    # ── average best_val_mre and best_val_mae per model (across all dataset sizes) ──
+    avg_metrics_by_model = (
+        results_df.groupby("model")[["best_val_mre", "best_val_mae"]]
+        .mean()
+        .rename(columns={
+            "best_val_mre": "avg_best_val_mre",
+            "best_val_mae": "avg_best_val_mae"
+        })
+        .reset_index()
+    )
+
+    print("\n" + "=" * 60)
+    print("Average Best Val MRE & MAE by Model (Across Dataset Sizes)")
+    print("=" * 60)
+    print(avg_metrics_by_model.to_string(index=False))
+
+
+    # ── average best_val_mre and best_val_mae per dataset size (across models) ──
+    avg_metrics_by_dataset_size = (
+        results_df.groupby("dataset_size")[["best_val_mre", "best_val_mae"]]
+        .mean()
+        .rename(columns={
+            "best_val_mre": "avg_best_val_mre",
+            "best_val_mae": "avg_best_val_mae"
+        })
+        .reset_index()
+    )
+
+    print("\n" + "=" * 60)
+    print("Average Best Val MRE & MAE by Dataset Size (Across Models)")
+    print("=" * 60)
+    print(avg_metrics_by_dataset_size.to_string(index=False))
+
+
+    # ── visualisation ─────────────────────────────────────────────────────────
+    models       = sorted(results_df["model"].unique())
+    dataset_sizes = sorted(results_df["dataset_size"].unique())
+
+    # pivot tables for grouped bars
+    mre_pivot = avg_val_mre.pivot(index="dataset_size", columns="model", values="avg_best_val_mre")
+    mae_pivot = avg_val_mae.pivot(index="dataset_size", columns="model", values="avg_best_val_mae")
+    fit_pivot = avg_fit_time.set_index("dataset_size")[["avg_fit_time"]]
+
+    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+    fig.suptitle("Neural Network Training Results — Summary", fontsize=14, y=1.02)
+
+    x      = np.arange(len(dataset_sizes))
+    n_mdl  = len(models)
+    width  = 0.18
+    offsets = np.linspace(-(n_mdl - 1) / 2, (n_mdl - 1) / 2, n_mdl) * width
+
+
+    def _grouped_bars(ax, pivot, ylabel, title):
+        for i, mdl in enumerate(models):
+            vals = pivot[mdl].values if mdl in pivot.columns else np.zeros(len(dataset_sizes))
+            bars = ax.bar(x + offsets[i], vals, width, label=mdl,
+                        alpha=0.88, linewidth=0)
+            for bar in bars:
+                h = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width() / 2, h * 1.015,
+                        f"{h:.4f}", ha="center", va="bottom", fontsize=6.5)
+        ax.set_xticks(x)
+        ax.set_xticklabels([str(s) for s in dataset_sizes])
+        ax.set_xlabel("Dataset Size")
+        ax.set_ylabel(ylabel)
+        ax.set_title(title, fontweight="bold", pad=10)
+        ax.yaxis.grid(True)
+        ax.set_axisbelow(True)
+        ax.legend(fontsize=7.5, loc="upper right")
+
+
+    # panel 1 — pal MRE
+    _grouped_bars(axes[0], mre_pivot, "Avg Best Val MRE", "Validation MRE by Model & Dataset Size")
+
+    # panel 2 — pal MAE
+    _grouped_bars(axes[1], mae_pivot, "Avg Best Val MAE", "Validation MAE by Model & Dataset Size")
+
+    # panel 3 — fit time (single series, no model split)
+    fit_vals = [fit_pivot.loc[s, "avg_fit_time"] for s in dataset_sizes]
+    bars = axes[2].bar(x, fit_vals, width=0.45, alpha=0.88, linewidth=0)
+    for bar in bars:
+        h = bar.get_height()
+        axes[2].text(bar.get_x() + bar.get_width() / 2, h * 1.015,
+                    f"{h:.1f}s", ha="center", va="bottom", fontsize=8)
+    axes[2].set_xticks(x)
+    axes[2].set_xticklabels([str(s) for s in dataset_sizes])
+    axes[2].set_xlabel("Dataset Size")
+    axes[2].set_ylabel("Avg Fit Time (s)")
+    axes[2].set_title("Average Fit Time by Dataset Size", fontweight="bold", pad=10)
+    axes[2].yaxis.grid(True)
+    axes[2].set_axisbelow(True)
+
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150, bbox_inches="tight")
+    plt.show()
+    print(f"\nFigure saved to {save_path}")
+
+
+def show_top_results(results_df, top_n=5):
+    """
+    Show the top N results based on best_val_mre
+    - inputs: results dataframe, number of top results to show
+    - outputs: prints the top N results
+    """
+    print(f"\nTop {top_n} Results by Best Validation MRE:")
+    print("=" * 60)
+    top_results = results_df.nsmallest(top_n, "best_val_mre")
+    print(top_results.to_string(index=False))
+
+
+def show_barplot_results(results_df, save_path="nn_saves/nn_results_analysis.png"):
+    """
+    Show a bar plot of best_val_mre for each parameter combination, sorted in ascending order.
+    - inputs: results dataframe, path to save the plot
+    - outputs: displays the bar plot and saves it to the specified path
+    """
+    # sort by best_val_mre ascending
+    results_sorted = results_df.sort_values("best_val_mre", ascending=True)
+
+    plt.figure(figsize=(12, 6))
+    plt.bar(range(len(results_sorted)), results_sorted["best_val_mre"], color="skyblue")
+    plt.xlabel("Parameter Combination ID")
+    plt.ylabel("Val MRE")
+    plt.title("Val MRE for Each Parameter Combination (Sorted)")
+    plt.xticks(range(len(results_sorted)), results_sorted["experiment_id"], rotation=90)
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150, bbox_inches="tight")
+    plt.show()
+    print(f"\nBar plot saved to {save_path}")
+
+
+def show_test_results_mre(y_test, y_pred, wavelengths):
+    """
+    Show the test results, including MRE and MRE per function and per wavelength.
+    - inputs: true test outputs, predicted test outputs, wavelengths
+    - outputs: prints MRE scores and displays plots of MRE per wavelength and per function
+    """
+    mre = mre_score(y_test, y_pred, wavelengths)
+    print("Testing MRE:", mre)
+
+    mre_per_func = mre_score(y_test, y_pred, wavelengths, axis=2)
+    for i in range(globals.N_FUNCTIONS):
+        print(f"{globals.function_names_plots[i]} MRE: {mre_per_func[i]:.4f}")
+
+    mre_per_wvl = mre_score(y_test, y_pred, wavelengths, axis=1)
+    fig, axes = plt.subplots(1, 2, figsize=(20, 5))
+    axes[0].plot(wavelengths, mre_per_wvl)
+    axes[0].set_xlabel("Wavelength (nm)")
+    axes[0].set_ylabel("MRE")
+    axes[0].set_title("MRE per Wavelength")
+    axes[0].grid()
+    axes[1].plot(wavelengths, mre_per_wvl)
+    axes[1].set_ylim(0, 0.6)
+    axes[1].set_xlabel("Wavelength (nm)")
+    axes[1].set_ylabel("MRE")
+    axes[1].set_title("MRE per Wavelength (Zoomed)")
+    axes[1].grid()
+    plt.tight_layout()
+    plt.show()
+
+    # MRE per wavelength again but in log scale to better visualize small values
+    mre_per_wvl_log = np.log10(mre_per_wvl + 1e-10)  # add small value to avoid log(0)
+    plt.figure(figsize=(10, 6))
+    plt.plot(wavelengths, mre_per_wvl_log)
+    plt.xlabel("Wavelength (nm)")
+    plt.ylabel("Log10(MRE)")
+    plt.title("Log10(MRE) per Wavelength")
+    plt.grid()
+    plt.tight_layout()
+    plt.show()
+
+    mre_per_func_wvl = mre_score(y_test, y_pred, wavelengths, axis=0)
+    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+    axes = axes.flatten()
+    for i in range(globals.N_FUNCTIONS):
+        axes[i].plot(wavelengths, mre_per_func_wvl[i])
+        axes[i].set_ylim(0, 1.25)
+        axes[i].set_xlabel("Wavelength (nm)")
+        axes[i].set_ylabel("MRE")
+        axes[i].set_title(f"MRE for {globals.function_names_plots[i]} per wavelength")
+        axes[i].grid()
+    plt.tight_layout()
+    plt.show()
+
+    # MRE per function again but in log scale to better visualize small values
+    mre_per_func_wvl_log = np.log10(mre_per_func_wvl + 1e-10)  # add small value to avoid log(0)
+    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+    axes = axes.flatten()
+    for i in range(globals.N_FUNCTIONS):
+        axes[i].plot(wavelengths, mre_per_func_wvl_log[i])
+        axes[i].set_xlabel("Wavelength (nm)")
+        axes[i].set_ylabel("Log10(MRE)")
+        axes[i].set_title(f"Log10(MRE) for {globals.function_names_plots[i]} per wavelength")
+        axes[i].grid()
+    plt.tight_layout()
+    plt.show()
+
+
+def show_test_results_mae(y_test, y_pred, wavelengths):
+    mae = mae_score(y_test, y_pred, wavelengths)
+    print("Testing MAE:", mae)
+
+    mae_per_func = mae_score(y_test, y_pred, wavelengths, axis=2)
+    for i in range(globals.N_FUNCTIONS):
+        print(f"{globals.function_names_plots[i]} MAE: {mae_per_func[i]:.4f}")
+
+    mae_per_wvl = mae_score(y_test, y_pred, wavelengths, axis=1)
+    plt.figure(figsize=(10, 5))
+    plt.plot(wavelengths, mae_per_wvl)
+    plt.xlabel("Wavelength (nm)")
+    plt.ylabel("MAE")
+    plt.title("MAE per wavelength")
+    plt.grid()
+    plt.show()
+
+    mae_per_func_wvl = mae_score(y_test, y_pred, wavelengths, axis=0)
+    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+    axes = axes.flatten()
+    for i in range(globals.N_FUNCTIONS):
+        axes[i].plot(wavelengths, mae_per_func_wvl[i])
+        axes[i].set_xlabel("Wavelength (nm)")
+        axes[i].set_ylabel("MAE")
+        axes[i].set_title(f"MAE for {globals.function_names_plots[i]} per wavelength")
+        axes[i].grid()
+    plt.tight_layout()
+    plt.show()
