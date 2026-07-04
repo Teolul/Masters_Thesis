@@ -30,5 +30,6 @@ param_names_plots_abb = ['O3', 'CWV', 'AOD', 'Asy. Param.', 'Ang. Exp.', 'SSA', 
 
 function_names_plots = ['Path Radiance', 'Direct Solar Irradiance', 'Diffuse Solar Irradiance', 'Spherical Albedo', 'Direct Transmittance', 'Diffuse Transmittance']
 function_names_plots_abb = ['Path Rad.', 'Direct Irrad.', 'Diffuse Irrad.', 'Sph. Alb.', 'Direct Trans.', 'Diffuse Trans.']
+function_names_results = ['path_rad', "dir_irr", "diff_irr", "sph_alb", "dir_trans", "diff_trans"]
 
 function_units_plots = ["W·m⁻²·sr⁻¹·nm⁻¹", "W·m⁻²·nm⁻¹", "W·m⁻²·nm⁻¹", "-", "-", "-"]

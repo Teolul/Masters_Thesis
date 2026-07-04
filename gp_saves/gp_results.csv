@@ -1,3 +1,0 @@
-experiment_id,gp_kernel_full_name,model,scale_type,dataset_size,fit_time,best_val_mre,best_val_mae
-Matern_minmax_500,"1**2*Matern(length_scale=[1,1,1,1,1,1,1,1,1],nu=2.5)+WhiteKernel(noise_level=0.01)",Matern,minmax,500,11.475001096725464,0.0024477318,0.20448226
-DotProduct_minmax_500,1**2*DotProduct(sigma_0=1)+WhiteKernel(noise_level=0.01),DotProduct,minmax,500,2.187009334564209,0.05043884,5.8869724

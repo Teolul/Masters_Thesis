@@ -488,7 +488,7 @@ def show_barplot_results(results_df, save_path="nn_saves/nn_results_analysis.png
     print(f"\nBar plot saved to {save_path}")
 
 
-def show_test_results_mre(y_test, y_pred, wavelengths):
+def show_test_results_mre(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_path="nn_saves/testing_results/"):
     """
     Show the test results, including MRE and MRE per function and per wavelength.
     - inputs: true test outputs, predicted test outputs, wavelengths
@@ -503,6 +503,7 @@ def show_test_results_mre(y_test, y_pred, wavelengths):
 
     mre_per_wvl = mre_score(y_test, y_pred, wavelengths, axis=1)
     fig, axes = plt.subplots(1, 2, figsize=(20, 5))
+    plt.suptitle(exp_id, fontsize=16, y=1.02)
     axes[0].plot(wavelengths, mre_per_wvl)
     axes[0].set_xlabel("Wavelength (nm)")
     axes[0].set_ylabel("MRE")
@@ -515,21 +516,25 @@ def show_test_results_mre(y_test, y_pred, wavelengths):
     axes[1].set_title("MRE per Wavelength (Zoomed)")
     axes[1].grid()
     plt.tight_layout()
+    plt.savefig(save_path + f"{exp_id}_mre_wavelengths.png", dpi=150, bbox_inches="tight")
     plt.show()
 
     # MRE per wavelength again but in log scale to better visualize small values
     mre_per_wvl_log = np.log10(mre_per_wvl + 1e-10)  # add small value to avoid log(0)
     plt.figure(figsize=(10, 6))
+    plt.suptitle(exp_id, fontsize=16, y=1.02)
     plt.plot(wavelengths, mre_per_wvl_log)
     plt.xlabel("Wavelength (nm)")
     plt.ylabel("Log10(MRE)")
     plt.title("Log10(MRE) per Wavelength")
     plt.grid()
     plt.tight_layout()
+    plt.savefig(save_path + f"{exp_id}_mre_wavelengths_log.png", dpi=150, bbox_inches="tight")
     plt.show()
 
     mre_per_func_wvl = mre_score(y_test, y_pred, wavelengths, axis=0)
     fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+    plt.suptitle(exp_id, fontsize=16, y=1.02)
     axes = axes.flatten()
     for i in range(globals.N_FUNCTIONS):
         axes[i].plot(wavelengths, mre_per_func_wvl[i])
@@ -539,11 +544,13 @@ def show_test_results_mre(y_test, y_pred, wavelengths):
         axes[i].set_title(f"MRE for {globals.function_names_plots[i]} per wavelength")
         axes[i].grid()
     plt.tight_layout()
+    plt.savefig(save_path + f"{exp_id}_mre_functions.png", dpi=150, bbox_inches="tight")
     plt.show()
 
     # MRE per function again but in log scale to better visualize small values
     mre_per_func_wvl_log = np.log10(mre_per_func_wvl + 1e-10)  # add small value to avoid log(0)
     fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+    plt.suptitle(exp_id, fontsize=16, y=1.02)
     axes = axes.flatten()
     for i in range(globals.N_FUNCTIONS):
         axes[i].plot(wavelengths, mre_per_func_wvl_log[i])
@@ -552,10 +559,18 @@ def show_test_results_mre(y_test, y_pred, wavelengths):
         axes[i].set_title(f"Log10(MRE) for {globals.function_names_plots[i]} per wavelength")
         axes[i].grid()
     plt.tight_layout()
+    plt.savefig(save_path + f"{exp_id}_mre_functions_log.png", dpi=150, bbox_inches="tight")
     plt.show()
 
+    return mre, mre_per_func
 
-def show_test_results_mae(y_test, y_pred, wavelengths):
+
+def show_test_results_mae(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_path="nn_saves/testing_results/"):
+    """
+    Show the test results, including MAE and MAE per function and per wavelength.
+    - inputs: true test outputs, predicted test outputs, wavelengths
+    - outputs: prints MAE scores and displays plots of MAE per wavelength and per function
+    """
     mae = mae_score(y_test, y_pred, wavelengths)
     print("Testing MAE:", mae)
 
@@ -565,15 +580,18 @@ def show_test_results_mae(y_test, y_pred, wavelengths):
 
     mae_per_wvl = mae_score(y_test, y_pred, wavelengths, axis=1)
     plt.figure(figsize=(10, 5))
+    plt.suptitle(exp_id, fontsize=16, y=1.02)
     plt.plot(wavelengths, mae_per_wvl)
     plt.xlabel("Wavelength (nm)")
     plt.ylabel("MAE")
     plt.title("MAE per wavelength")
     plt.grid()
+    plt.savefig(save_path + f"{exp_id}_mae_wavelengths.png", dpi=150, bbox_inches="tight")
     plt.show()
 
     mae_per_func_wvl = mae_score(y_test, y_pred, wavelengths, axis=0)
     fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+    plt.suptitle(exp_id, fontsize=16, y=1.02)
     axes = axes.flatten()
     for i in range(globals.N_FUNCTIONS):
         axes[i].plot(wavelengths, mae_per_func_wvl[i])
@@ -582,4 +600,71 @@ def show_test_results_mae(y_test, y_pred, wavelengths):
         axes[i].set_title(f"MAE for {globals.function_names_plots[i]} per wavelength")
         axes[i].grid()
     plt.tight_layout()
+    plt.savefig(save_path + f"{exp_id}_mae_functions.png", dpi=150, bbox_inches="tight")
+    plt.show()
+
+    return mae, mae_per_func
+
+
+def show_predicted_vs_true(y_test, y_pred, y_std, wavelengths, exp_id="EXP_ID", save_path="nn_saves/testing_results/"):
+    """
+    Show the mean predicted vs true functions across all samples, with optional uncertainty bands.
+    - inputs: true test outputs, predicted test outputs, predicted standard deviation (optional), wavelengths
+    - outputs: displays plots of mean predicted vs true functions for each function
+    """
+    # --- compute mean true and predicted functions across all samples ---
+    Y_true_mean = np.mean(y_test, axis=0)        # shape: (6, 4205)
+    Y_pred_mean = np.mean(y_pred, axis=0)       # shape: (6, 4205)
+    if y_std is not None:
+        Y_std_mean = np.mean(y_std, axis=0)        # shape: (6, 4205)
+
+    # plot mean true vs predicted
+    plt.figure(figsize=(15, 10))
+    plt.suptitle(f"Mean Predicted vs True Functions — {exp_id}", fontsize=16, y=1.02)
+
+    for i in range(globals.N_FUNCTIONS):  # iterate over functions
+        plt.subplot(2, 3, i + 1)
+
+        plt.plot(wavelengths, Y_pred_mean[i], label="Mean Predicted")
+        if y_std is not None:
+            # with Gaussian prior, 2 standard deviations should cover ~95% of the true function values
+            plt.fill_between(wavelengths, Y_pred_mean[i] - 2 * Y_std_mean[i], Y_pred_mean[i] + 2 * Y_std_mean[i], color="blue", alpha=0.2, label="Predicted Std Dev")
+        plt.plot(wavelengths, Y_true_mean[i], label="Mean True")
+
+        plt.title(f"{globals.function_names_plots[i]}")
+        plt.xlabel("Wavelength (nm)")
+        plt.ylabel("Function Value (" + globals.function_units_plots[i] + ")")
+        plt.legend()
+
+    plt.tight_layout()
+    plt.savefig(save_path + f"{exp_id}_predicted_vs_true.png", dpi=150, bbox_inches="tight")
+    plt.show()
+
+
+def show_residuals(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_path="nn_saves/testing_results/"):
+    """
+    Show the residuals of the predictions on the test set.
+    - inputs: true test outputs, predicted test outputs, wavelengths
+    - outputs: displays plots of mean residuals for each function
+    """
+    # --- residuals for all samples ---
+    residuals = y_pred - y_test   # shape: (n_samples, 6, 4205)
+
+    # mean residual across samples
+    mean_residuals = np.mean(residuals, axis=0)  # shape: (6, 4205)
+
+    plt.figure(figsize=(15, 10))
+    plt.suptitle(f"Residuals — {exp_id}", fontsize=16, y=1.02)
+    for i in range(globals.N_FUNCTIONS):
+        plt.subplot(2, 3, i + 1)
+
+        plt.plot(wavelengths, mean_residuals[i])
+        plt.axhline(0, linestyle="--")
+
+        plt.title(f"Mean Residuals - {globals.function_names_plots[i]}")
+        plt.xlabel("Wavelength (nm)")
+        plt.ylabel("Prediction Error")
+
+    plt.tight_layout()
+    plt.savefig(save_path + f"{exp_id}_residuals.png", dpi=150, bbox_inches="tight")
     plt.show()
