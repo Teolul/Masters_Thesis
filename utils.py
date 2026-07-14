@@ -4,8 +4,10 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
-from sklearn.decomposition import PCA, KernelPCA
+from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
+
+from sklearn.gaussian_process.kernels import RBF, Matern, RationalQuadratic, WhiteKernel, ConstantKernel as C, DotProduct
 
 import globals
 
@@ -13,6 +15,8 @@ import globals
 # Utilities for loading data, preprocessing, and evaluation
 # ----------------------------
 
+
+#region LOADING AND PREPARING DATA
 
 def inspect_metadata(path):
     """
@@ -117,6 +121,9 @@ def train_val_test_split(X, Y, wavelengths, verbose=True):
     
     return X_tr, X_val, X_test, Y_tr, Y_val, Y_test
 
+#endregion
+
+#region DIMENSIONALITY REDUCTION AND SCALING
 
 def apply_pca(y_tr, y_val, n_components=10):
     """
@@ -195,6 +202,9 @@ def scale_output_data(y_tr, y_val, scale_type="standard"):
 
     return y_scalers, y_tr_scaled, y_val_scaled
 
+#endregion
+
+#region SCORING METRICS
 
 def build_mask(wavelengths):
     """
@@ -315,8 +325,10 @@ def calculate_coverage(y_true, y_pred, y_std, n_std=2):
 
     return global_coverage, per_function_coverage
 
+#endregion
 
-# ============================= PLOTTING UTILITIES =============================
+#region PLOTTING UTILITIES
+
 def show_fit_val_summary(results_df, save_path="nn_saves/nn_results_analysis.png"):
     # ── average fit time per dataset size ────────────────────────────────────
     avg_fit_time = (
@@ -668,3 +680,102 @@ def show_residuals(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_path="nn_s
     plt.tight_layout()
     plt.savefig(save_path + f"{exp_id}_residuals.png", dpi=150, bbox_inches="tight")
     plt.show()
+
+#endregion
+
+#region GP-SPECIFIC UTILITIES
+
+n_feat = globals.N_INPUTS
+
+kern_rbf = (
+        C(1.0, (1e-3, 1e3)) *
+        RBF(length_scale=np.ones(n_feat), length_scale_bounds=(1e-3, 1e3))
+        + WhiteKernel(noise_level=1e-2, noise_level_bounds=(1e-5, 1e1))
+    )
+
+kern_matern = (
+    C(1.0, (1e-3, 1e3))
+    * Matern(
+        length_scale=np.ones(n_feat),
+        length_scale_bounds=(1e-3, 1e3),
+        nu=2.5
+    )
+    + WhiteKernel(1e-2, (1e-5, 1e1))
+)
+
+kern_rq = (
+    C(1.0, (1e-3, 1e3))
+    * RationalQuadratic(
+        length_scale=1.0,
+        alpha=1.0,
+        length_scale_bounds=(1e-3, 1e3),
+        alpha_bounds=(1e-3, 1e3)
+    )
+    + WhiteKernel(1e-2, (1e-5, 1e1))
+)
+
+kern_rbf_rq = (
+    C(1.0, (1e-3, 1e3))
+    * (
+        RBF(
+            length_scale=np.ones(n_feat),
+            length_scale_bounds=(1e-3, 1e3)
+        )
+        + RationalQuadratic(
+            length_scale=1.0,
+            alpha=1.0
+        )
+    )
+    + WhiteKernel(1e-2, (1e-5, 1e1))
+)
+
+kern_dot_rbf = (
+    C(1.0, (1e-3, 1e3))
+    * (
+        DotProduct()
+        + RBF(
+            length_scale=np.ones(n_feat),
+            length_scale_bounds=(1e-3, 1e3)
+        )
+    )
+    + WhiteKernel(1e-2, (1e-5, 1e1))
+)
+
+kern_linear = (
+    C(1.0, (1e-3, 1e3))
+    * DotProduct()
+    + WhiteKernel(1e-2, (1e-5, 1e1))
+)
+
+kern_matern_rq = (
+    C(1.0, (1e-3, 1e3))
+    * (
+        Matern(
+            length_scale=np.ones(n_feat),
+            nu=1.5
+        )
+        + RationalQuadratic()
+    )
+    + WhiteKernel(1e-2, (1e-5, 1e1))
+)
+
+
+def inverse_mean_transform(y_red_scaled, scaler, pca):
+    y_red = scaler.inverse_transform(y_red_scaled)
+    return pca.inverse_transform(y_red)
+
+
+def inverse_std_transform(std_red_scaled, scaler, pca):
+    if str(scaler) == "StandardScaler()":
+        Y_std_red = std_red_scaled * scaler.scale_
+    else: # MinMaxScaler
+        Y_std_red = std_red_scaled * (scaler.data_max_ - scaler.data_min_)
+
+    W = pca.components_
+    latent_var = Y_std_red**2
+    Y_var_full = latent_var @ (W**2)
+    Y_std_full = np.sqrt(Y_var_full)
+
+    return Y_std_full
+
+#endregion
