@@ -294,7 +294,7 @@ class Encoder5(nn.Module):
     def __init__(self, z_dim=128):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(8, 64), # first number is the number of features after feature selection
+            nn.Linear(9, 64), # first number is the number of features after feature selection
             nn.SiLU(),
             nn.Linear(64, 128),
             nn.SiLU(),
