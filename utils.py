@@ -10,6 +10,7 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.gaussian_process.kernels import RBF, Matern, RationalQuadratic, WhiteKernel, ConstantKernel as C, DotProduct
 
 import globals
+import nn_models
 
 # ----------------------------
 # Utilities for loading data, preprocessing, and evaluation
@@ -777,5 +778,14 @@ def inverse_std_transform(std_red_scaled, scaler, pca):
     Y_std_full = np.sqrt(Y_var_full)
 
     return Y_std_full
+
+#endregion
+
+#region NN-SPECIFIC UTILITIES
+
+
+
+
+
 
 #endregion
