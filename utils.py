@@ -1010,7 +1010,10 @@ def nn_run_experiment(model_name, encoder_version, scale_type, config, device, w
         for X_batch, Y_batch in tqdm(train_dl, desc=f"[{exp_id}] E{epoch+1} Train", leave=False):
             X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
             optimizer.zero_grad()
-            y_pred = model(X_batch)
+            if model_name == "EmulatorSet5":
+                y_pred, _ = model(X_batch)
+            else:
+                y_pred = model(X_batch)
             loss   = criterion(y_pred, Y_batch)
             loss.backward()
             optimizer.step()
@@ -1033,7 +1036,10 @@ def nn_run_experiment(model_name, encoder_version, scale_type, config, device, w
         with torch.no_grad():
             for X_batch, Y_batch in tqdm(val_dl, desc=f"[{exp_id}] E{epoch+1} Val", leave=False):
                 X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
-                y_pred = model(X_batch)
+                if model_name == "EmulatorSet5":
+                    y_pred, _ = model(X_batch)
+                else:
+                    y_pred = model(X_batch)
                 loss   = criterion(y_pred, Y_batch)
 
                 epoch_val_loss += loss.item() * X_batch.size(0)

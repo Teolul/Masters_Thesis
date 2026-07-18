@@ -307,48 +307,95 @@ class Encoder5(nn.Module):
 
 
 class SpectralDecoder5(nn.Module):
-    def __init__(self, z_dim=128, channels=16, initial_length=32):
+    def __init__(self, z_dim=128, channels=64, initial_length=32):
         super().__init__()
         self.fc = nn.Linear(z_dim, channels * initial_length)
         self.initial_length = initial_length
         self.channels = channels
 
-        # processing at low-res (16ch x 32len)
         self.initial_conv = nn.Sequential(
-            nn.Conv1d(channels, 32, kernel_size=5, padding=2),
-            nn.GroupNorm(8, 32),
+            nn.Conv1d(channels, 128, kernel_size=5, padding=2),
+            nn.GroupNorm(16, 128),
             nn.SiLU()
         )
 
         # progressively upsample the sequence length
-        self.upsample_pipeline = nn.Sequential(
-            nn.ConvTranspose1d(32, 24, kernel_size=6, stride=4, padding=1),
+        self.up1 = nn.Sequential(
+            nn.ConvTranspose1d(128, 96, kernel_size=5, stride=2, padding=1),
+            nn.GroupNorm(16, 96),
+            nn.SiLU()
+        )
+        self.up2 = nn.Sequential(
+            nn.ConvTranspose1d(96, 64, kernel_size=5, stride=2, padding=1),
+            nn.GroupNorm(8, 64),
+            nn.SiLU()
+        )
+        self.up3 = nn.Sequential(
+            nn.ConvTranspose1d(64, 32, kernel_size=5, stride=2, padding=1),
+            nn.GroupNorm(8, 32),
+            nn.SiLU()
+        )
+        self.up4 = nn.Sequential(
+            nn.ConvTranspose1d(32, 24, kernel_size=5, stride=2, padding=2),
             nn.GroupNorm(8, 24),
-            nn.SiLU(),
-            nn.ConvTranspose1d(24, 16, kernel_size=6, stride=4, padding=1),
-            nn.GroupNorm(8, 16),
-            nn.SiLU(),
-            nn.ConvTranspose1d(16, 12, kernel_size=6, stride=4, padding=1),
+            nn.SiLU()
+        )
+        self.up5 = nn.Sequential(
+            nn.ConvTranspose1d(24, 16, kernel_size=5, stride=2, padding=1),
+            nn.GroupNorm(4, 16),
+            nn.SiLU()
+        )
+        self.up6 = nn.Sequential(
+            nn.ConvTranspose1d(16, 12, kernel_size=5, stride=2, padding=1),
             nn.GroupNorm(4, 12),
-            nn.SiLU(),
-            nn.ConvTranspose1d(12, 8, kernel_size=4, stride=2, padding=1),
+            nn.SiLU()
+        )
+        self.up7 = nn.Sequential(
+            nn.ConvTranspose1d(12, 8, kernel_size=5, stride=2, padding=2),
             nn.GroupNorm(4, 8),
-            nn.SiLU(),
+            nn.SiLU()
         )
 
         # final adjustment to hit exactly 4205 and map to 1 output channel
         self.final_conv = nn.Conv1d(8, 1, kernel_size=5, padding=2)
 
-    def forward(self, z):
+    def forward(self, z, return_features=True):
+        feats = {}
+
         x = self.fc(z).view(z.size(0), self.channels, self.initial_length)
+        feats["32"] = x
+
         x = self.initial_conv(x)
-        x = self.upsample_pipeline(x)  # (N, 8, 4096)
+        feats["32_conv"] = x
 
-        # from 4096, use a tiny interpolation just to cover the last 109 points
-        x = F.interpolate(x, size=4205, mode="linear", align_corners=False)
+        x = self.up1(x)
+        feats["65"] = x
 
-        x = self.final_conv(x).squeeze(1)
-        return x
+        x = self.up2(x)
+        feats["131"] = x
+
+        x = self.up3(x)
+        feats["263"] = x
+
+        x = self.up4(x)
+        feats["525"] = x
+
+        x = self.up5(x)
+        feats["1051"] = x
+
+        x = self.up6(x)
+        feats["2103"] = x
+
+        x = self.up7(x)
+        feats["4205"] = x
+
+        x = self.final_conv(x)
+        feats["4205_conv"] = x
+
+        if return_features:
+            return x.squeeze(1), feats
+
+        return x.squeeze(1)
     
 class EmulatorSet5(nn.Module):
     def __init__(self, encoder_type="single"):
@@ -380,4 +427,9 @@ class EmulatorSet5(nn.Module):
             ]
             
         # return prediction as one tensor of shape (N, 6, 4205)
-        return torch.stack(outputs, dim=1)
+        model_outputs = []
+        model_features = []
+        for out in outputs:
+            model_outputs.append(out[0])
+            model_features.append(out[1])
+        return torch.stack(model_outputs, dim=1), model_features
