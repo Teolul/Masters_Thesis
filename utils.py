@@ -137,7 +137,7 @@ def train_val_test_split(X, Y, wavelengths, verbose=True):
 
 #region DIMENSIONALITY REDUCTION AND SCALING
 
-def apply_pca(y_tr, y_val, n_components=10):
+def apply_pca(y_tr, y_val, n_components=10, verbose=True):
     """
     Apply PCA to each function separately, retaining n_components components.
     - y_tr: training outputs of shape (n_samples, n_functions, n_wavelengths)
@@ -159,16 +159,17 @@ def apply_pca(y_tr, y_val, n_components=10):
         pca_list.append(pca)
 
     # print amount of explained variance and number of components for each function
-    total_explained_variance = 0
-    print("  Regular PCA used, displaying results:")
-    for i, pca in enumerate(pca_list):
-        explained_variance = pca.explained_variance_ratio_.sum()
-        total_explained_variance += explained_variance
-        print(f"  Function {i+1}: Explained variance = {explained_variance:.4f}")
-        print(f"  Number of components retained: {pca.n_components_}")
-        print()
+    if verbose:
+        total_explained_variance = 0
+        print("  Regular PCA used, displaying results:")
+        for i, pca in enumerate(pca_list):
+            explained_variance = pca.explained_variance_ratio_.sum()
+            total_explained_variance += explained_variance
+            print(f"  Function {i+1}: Explained variance = {explained_variance:.4f}")
+            print(f"  Number of components retained: {pca.n_components_}")
+            print()
 
-    print(f"  Total explained variance = {total_explained_variance:.4f}")
+        print(f"  Total explained variance = {total_explained_variance:.4f}")
 
     print("---------- PCA application completed. ----------\n")
 
