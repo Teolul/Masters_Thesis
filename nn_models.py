@@ -288,8 +288,6 @@ class EmulatorSet4(nn.Module):
 
 
 # 5th ARCHITECTURE: physics-informed full-spectrum emulator.
-# Encoder: symbolic physics features plus learnable multi-output feature selection.
-# Decoder: function-correlation mixing plus spectral-region-specific convolutions.
 class ResidualFCBlock(nn.Module):
     """A single Linear layer wrapped with a (projected) skip connection.
     Learns a residual on top of an identity/linear-projected input instead
@@ -551,8 +549,7 @@ class SpectralDecoder5(nn.Module):
         return out
  
  
-# Region configs, one list per radiative transfer function, based on visual
-# inspection of the provided sample plots. Each tuple is
+# Region configs, one list per radiative transfer function. Each tuple is
 # (start_frac, end_frac, kernel_size) along the 400-2500nm spectrum.
 # IMPORTANT: this assumes decoders[i] corresponds to the i-th function in
 # this exact order -- double check this matches your actual dataset/
