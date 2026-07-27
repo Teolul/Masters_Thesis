@@ -775,7 +775,9 @@ kern_matern_rq = (
 
 def inverse_mean_transform(y_red_scaled, scaler, pca):
     y_red = scaler.inverse_transform(y_red_scaled)
-    return pca.inverse_transform(y_red)
+    if pca != None:
+        y_red = pca.inverse_transform(y_red)
+    return y_red
 
 
 def inverse_std_transform(std_red_scaled, scaler, pca):
@@ -784,12 +786,13 @@ def inverse_std_transform(std_red_scaled, scaler, pca):
     else: # MinMaxScaler
         Y_std_red = std_red_scaled * (scaler.data_max_ - scaler.data_min_)
 
-    W = pca.components_
-    latent_var = Y_std_red**2
-    Y_var_full = latent_var @ (W**2)
-    Y_std_full = np.sqrt(Y_var_full)
+    if pca != None:
+        W = pca.components_
+        latent_var = Y_std_red**2
+        Y_var_red = latent_var @ (W**2)
+        Y_std_red = np.sqrt(Y_var_red)
 
-    return Y_std_full
+    return Y_std_red
 
 #endregion
 

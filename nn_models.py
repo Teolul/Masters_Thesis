@@ -496,8 +496,7 @@ class SpectralDecoder5(nn.Module):
  
         # last-mile stage: region-specific (kernel, padding) branches instead
         # of a single global up7 + final_conv. Defaults to one region
-        # (kernel=5) if no region_config is given, reproducing the original
-        # un-branched behavior exactly.
+        # (kernel=5) if no region_config is given
         self.final_stage = RegionBranchingBlock(
             in_ch=12, mid_ch=8, in_len=2103, out_len=spectrum_len,
             regions=region_config or [(0.0, 1.0, 5)],
