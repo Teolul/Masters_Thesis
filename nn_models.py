@@ -583,12 +583,12 @@ class SpectralDecoder5(nn.Module):
  
 
 REGION_CONFIGS = [
-    [(400, 900, 3), (900, 2500, 11)],                      # 0: Path Radiance
-    [(400, 950, 3), (950, 2000, 5), (2000, 2500, 9)],      # 1: Direct Solar Irradiance
-    [(400, 1000, 3), (1000, 2500, 11)],                    # 2: Diffuse Solar Irradiance
-    [(400, 1000, 3), (1000, 2000, 5), (2000, 2500, 9)],    # 3: Spherical Albedo
-    [(400, 950, 3), (950, 2000, 3), (2000, 2500, 7)],      # 4: Direct Transmittance
-    [(400, 1000, 3), (1000, 2000, 5), (2000, 2500, 9)],    # 5: Diffuse Transmittance
+    [(400, 900, 3), (900, 2506, 11)],                      # 0: Path Radiance
+    [(400, 1350, 3), (1350, 1400, 7), (1400, 1800, 3), (1800, 1950, 7),  (1950, 2506, 3)],      # 1: Direct Solar Irradiance
+    [(400, 1450, 3), (1450, 2506, 7)],                    # 2: Diffuse Solar Irradiance
+    [(400, 1000, 3), (1000, 2000, 3), (2000, 2506, 3)],    # 3: Spherical Albedo
+    [(400, 950, 3), (950, 2000, 3), (2000, 2506, 3)],      # 4: Direct Transmittance
+    [(400, 1000, 3), (1000, 2000, 3), (2000, 2506, 3)],    # 5: Diffuse Transmittance
 ]
 
 
