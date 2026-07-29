@@ -286,7 +286,6 @@ class EmulatorSet4(nn.Module):
 
         return torch.stack(outputs, dim=1)
 
-
 # 5th ARCHITECTURE: physics-informed full-spectrum emulator.
 class ResidualFCBlock(nn.Module):
     """A single Linear layer wrapped with a (projected) skip connection.
@@ -399,8 +398,19 @@ class GlobalSpectralResidual(nn.Module):
         centered = spectra - mean
         _, _, Vt = torch.linalg.svd(centered, full_matrices=False)
         self.basis.copy_(Vt[: self.n_modes].to(self.basis.dtype))
- 
- 
+
+
+def _wavelength_to_index(wl, wavelengths):
+    """Index of the closest sample in `wavelengths` (a 1D tensor covering
+    the full spectrum) to wavelength `wl` (nm), clamped so a wl at or below
+    the grid minimum maps to index 0, and a wl at or above the grid maximum
+    maps to len(wavelengths) (an exclusive stop covering the last sample)."""
+    if wl <= wavelengths[0]:
+        return 0
+    if wl >= wavelengths[-1]:
+        return len(wavelengths)
+    return int(torch.argmin((wavelengths - wl).abs()))
+
 class RegionBranchingBlock(nn.Module):
     """Replaces a single global 'upsample + read out' stage with parallel,
     region-specific branches. Each branch covers one contiguous portion of
@@ -419,18 +429,31 @@ class RegionBranchingBlock(nn.Module):
     never leaves the concatenated output a sample short or long.
     """
  
-    def __init__(self, in_ch, mid_ch, in_len, out_len, regions, num_groups):
+    def __init__(self, in_ch, mid_ch, in_len, wavelengths, regions, num_groups):
         super().__init__()
+        wavelengths = torch.as_tensor(wavelengths, dtype=torch.float32)
+        out_len = wavelengths.shape[0]
         self.out_len = out_len
         self.regions = regions
         self.up_branches = nn.ModuleList()
         self.norms = nn.ModuleList()
         self.readout_branches = nn.ModuleList()
+        self._bounds = []  # precomputed (i0, i1, o0, o1) per region
         stride = 2
- 
-        for (f0, f1, k) in regions:
-            i0, i1 = round(f0 * in_len), round(f1 * in_len)
-            o0, o1 = round(f0 * out_len), round(f1 * out_len)
+
+        n_regions = len(regions)
+        for idx, (wl0, wl1, k) in enumerate(regions):
+            # force the very first/last region to cover the true edges
+            # exactly, regardless of whether the specified nm boundary
+            # matches the wavelength grid's actual min/max -- otherwise a
+            # mismatch (e.g. real data doesn't start exactly at 400nm)
+            # silently leaves a gap of a few samples uncovered by any branch
+            o0 = 0 if idx == 0 else _wavelength_to_index(wl0, wavelengths)
+            o1 = out_len if idx == n_regions - 1 else _wavelength_to_index(wl1, wavelengths)
+            i0 = round(o0 / out_len * in_len)
+            i1 = round(o1 / out_len * in_len)
+            self._bounds.append((i0, i1, o0, o1))
+
             in_span, out_span = i1 - i0, o1 - o0
             pad = max(0, round(((in_span - 1) * stride + k - out_span) / 2))
             self.up_branches.append(
@@ -438,15 +461,24 @@ class RegionBranchingBlock(nn.Module):
             )
             self.norms.append(nn.GroupNorm(num_groups, mid_ch))
             self.readout_branches.append(nn.Conv1d(mid_ch, 1, kernel_size=k, padding=k // 2))
- 
+
+        # sanity check: regions must exactly tile [0, out_len) with no
+        # gaps/overlaps in the middle (typo'd/mismatched boundary nm values
+        # between adjacent regions would otherwise fail silently)
+        for (_, _, _, o1_prev), (_, _, o0_next, _) in zip(self._bounds, self._bounds[1:]):
+            if o1_prev != o0_next:
+                raise ValueError(
+                    f"Region boundary mismatch: one region ends at index {o1_prev} "
+                    f"but the next starts at index {o0_next}. Make sure each "
+                    f"region's end_wavelength_nm exactly matches the next "
+                    f"region's start_wavelength_nm."
+                )
+
         self.act = nn.SiLU()
  
     def forward(self, x):
-        in_len = x.shape[-1]
         mid_segs, bounds = [], []
-        for (f0, f1, k), up, norm in zip(self.regions, self.up_branches, self.norms):
-            i0, i1 = round(f0 * in_len), round(f1 * in_len)
-            o0, o1 = round(f0 * self.out_len), round(f1 * self.out_len)
+        for (i0, i1, o0, o1), up, norm in zip(self._bounds, self.up_branches, self.norms):
             seg = x[:, :, i0:i1]
             seg_up = self.act(norm(up(seg)))
             target_len = o1 - o0
@@ -455,7 +487,7 @@ class RegionBranchingBlock(nn.Module):
             mid_segs.append(seg_up)
             bounds.append((o0, o1))
         mid = torch.cat(mid_segs, dim=-1)
- 
+
         out_segs = []
         for readout, (o0, o1) in zip(self.readout_branches, bounds):
             out_segs.append(readout(mid[:, :, o0:o1]))
@@ -479,11 +511,13 @@ class Encoder5(nn.Module):
  
 class SpectralDecoder5(nn.Module):
     def __init__(self, z_dim=128, channels=64, initial_length=32, spectrum_len=4205,
-                 n_global_modes=8, region_config=None):
+                 n_global_modes=8, region_config=None, wavelengths=None):
         super().__init__()
         self.fc = nn.Linear(z_dim, channels * initial_length)
         self.initial_length = initial_length
         self.channels = channels
+        if wavelengths is None:
+            wavelengths = torch.linspace(400.0, 2500.0, spectrum_len)
  
         self.initial_conv = ResidualConv1D(channels, 128, kernel_size=5, stride=1, padding=2, num_groups=16, transpose=False)
  
@@ -498,8 +532,8 @@ class SpectralDecoder5(nn.Module):
         # of a single global up7 + final_conv. Defaults to one region
         # (kernel=5) if no region_config is given
         self.final_stage = RegionBranchingBlock(
-            in_ch=12, mid_ch=8, in_len=2103, out_len=spectrum_len,
-            regions=region_config or [(0.0, 1.0, 5)],
+            in_ch=12, mid_ch=8, in_len=2103, wavelengths=wavelengths,
+            regions=region_config or [(wavelengths[0].item(), wavelengths[-1].item(), 5)],
             num_groups=4,
         )
  
@@ -547,35 +581,19 @@ class SpectralDecoder5(nn.Module):
             return out, feats
         return out
  
- 
-# Region configs, one list per radiative transfer function. Each tuple is
-# (start_frac, end_frac, kernel_size) along the 400-2500nm spectrum.
-# IMPORTANT: this assumes decoders[i] corresponds to the i-th function in
-# this exact order -- double check this matches your actual dataset/
-# training pipeline ordering, and re-tune the fractions once you have the
-# real wavelength grid (these are eyeballed from one sample's plot).
+
 REGION_CONFIGS = [
-    # 0: Path Radiance -- dense narrow lines 400-900nm, then flat near-zero tail
-    [(0.00, 0.24, 3), (0.24, 1.00, 11)],
-    # 1: Direct Solar Irradiance -- oscillatory through ~2000nm (incl. the
-    # two broad troughs near 1350-1500nm & 1800-1950nm), calmer tail
-    [(0.00, 0.26, 3), (0.26, 0.76, 5), (0.76, 1.00, 9)],
-    # 2: Diffuse Solar Irradiance -- dense narrow lines 400-1000nm, then flat tail
-    [(0.00, 0.29, 3), (0.29, 1.00, 11)],
-    # 3: Spherical Albedo -- narrow dips on smooth decay (400-1000nm),
-    # broader dips (1000-2000nm), flatter noisy tail (2000-2500nm)
-    [(0.00, 0.29, 3), (0.29, 0.76, 5), (0.76, 1.00, 9)],
-    # 4: Direct Transmittance -- rising oscillatory + several sharp deep
-    # dips through ~2000nm (kept fine to not blur the deep dips), mildly
-    # calmer tail
-    [(0.00, 0.26, 3), (0.26, 0.76, 3), (0.76, 1.00, 7)],
-    # 5: Diffuse Transmittance -- same overall shape family as Spherical Albedo
-    [(0.00, 0.29, 3), (0.29, 0.76, 5), (0.76, 1.00, 9)],
+    [(400, 900, 3), (900, 2500, 11)],                      # 0: Path Radiance
+    [(400, 950, 3), (950, 2000, 5), (2000, 2500, 9)],      # 1: Direct Solar Irradiance
+    [(400, 1000, 3), (1000, 2500, 11)],                    # 2: Diffuse Solar Irradiance
+    [(400, 1000, 3), (1000, 2000, 5), (2000, 2500, 9)],    # 3: Spherical Albedo
+    [(400, 950, 3), (950, 2000, 3), (2000, 2500, 7)],      # 4: Direct Transmittance
+    [(400, 1000, 3), (1000, 2000, 5), (2000, 2500, 9)],    # 5: Diffuse Transmittance
 ]
- 
- 
+
+
 class EmulatorSet5(nn.Module):
-    def __init__(self, encoder_type="single"):
+    def __init__(self, encoder_type="single", wavelengths=None):
         super().__init__()
         self.encoder_type = encoder_type
         if encoder_type == "single":
@@ -586,7 +604,7 @@ class EmulatorSet5(nn.Module):
             ])
  
         self.decoders = nn.ModuleList([
-            SpectralDecoder5(region_config=REGION_CONFIGS[i])
+            SpectralDecoder5(region_config=REGION_CONFIGS[i], wavelengths=wavelengths)
             for i in range(globals.N_FUNCTIONS)
         ])
  

@@ -903,7 +903,7 @@ ARCHITECTURES = {
 }
 
 ENCODER_VERSIONS = [
-    "single", 
+    "single",
     # "multi",
 ]
 
@@ -1074,7 +1074,10 @@ def nn_run_experiment(model_name, encoder_version, scale_type, config, device, w
 
     # --- build model ---
     ModelClass = ARCHITECTURES[model_name]
-    model = ModelClass(encoder_type=encoder_version).to(device)
+    if model_name == "EmulatorSet5":
+        model = ModelClass(encoder_type=encoder_version, wavelengths=wavelengths).to(device)
+    else:
+        model = ModelClass(encoder_type=encoder_version).to(device)
 
     # --- data ---
     train_ds, val_ds, train_dl, val_dl, y_scalers, pca_list = nn_get_loaders_and_scalers(
