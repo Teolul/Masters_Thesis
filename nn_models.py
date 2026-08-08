@@ -582,7 +582,7 @@ class SpectralDecoder5(nn.Module):
         return out
  
 
-REGION_CONFIGS = [
+DEFAULT_REGION_CONFIGS = [
     [(400, 900, 3), (900, 2506, 11)],                      # 0: Path Radiance
     [(400, 1350, 3), (1350, 1400, 7), (1400, 1800, 3), (1800, 1950, 7),  (1950, 2506, 3)],      # 1: Direct Solar Irradiance
     [(400, 1450, 3), (1450, 2506, 7)],                    # 2: Diffuse Solar Irradiance
@@ -593,8 +593,13 @@ REGION_CONFIGS = [
 
 
 class EmulatorSet5(nn.Module):
-    def __init__(self, encoder_type="single", wavelengths=None):
+    def __init__(self, encoder_type="single", wavelengths=None, region_configs=None):
         super().__init__()
+        if region_configs is None:
+            self.region_configs = DEFAULT_REGION_CONFIGS
+        else:
+            self.region_configs = region_configs
+
         self.encoder_type = encoder_type
         if encoder_type == "single":
             self.encoder = Encoder5()
@@ -604,7 +609,7 @@ class EmulatorSet5(nn.Module):
             ])
  
         self.decoders = nn.ModuleList([
-            SpectralDecoder5(region_config=REGION_CONFIGS[i], wavelengths=wavelengths)
+            SpectralDecoder5(region_config=self.region_configs[i], wavelengths=wavelengths)
             for i in range(globals.N_FUNCTIONS)
         ])
  

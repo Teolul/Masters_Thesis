@@ -17,7 +17,7 @@ import torch
 from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from sklearn.gaussian_process.kernels import RBF, Matern, RationalQuadratic, WhiteKernel, ConstantKernel as C, DotProduct
+from sklearn.gaussian_process.kernels import ConstantKernel as C
 
 import globals
 import nn_models
@@ -682,6 +682,16 @@ def show_test_results_mre(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_pat
     plt.savefig(save_path + f"{exp_id}_mre_functions_log.png", dpi=150, bbox_inches="tight")
     plt.show()
 
+    file_path = save_path + "mre_per_wvl_log.pkl"
+    if os.path.exists(file_path):
+        with open(file_path, "rb") as f:
+            mre_dict = pickle.load(f)
+    else:
+        mre_dict = {}
+    mre_dict[exp_id] = mre_per_wvl_log
+    with open(file_path, "wb") as f:
+        pickle.dump(mre_dict, f)
+
     return mre, mre_per_func
 
 
@@ -722,6 +732,16 @@ def show_test_results_mae(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_pat
     plt.tight_layout()
     plt.savefig(save_path + f"{exp_id}_mae_functions.png", dpi=150, bbox_inches="tight")
     plt.show()
+
+    file_path = save_path + "mae_per_wvl.pkl"
+    if os.path.exists(file_path):
+        with open(file_path, "rb") as f:
+            mae_dict = pickle.load(f)
+    else:
+        mae_dict = {}
+    mae_dict[exp_id] = mae_per_wvl
+    with open(file_path, "wb") as f:
+        pickle.dump(mae_dict, f)
 
     return mae, mae_per_func
 
@@ -789,84 +809,22 @@ def show_residuals(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_path="nn_s
     plt.savefig(save_path + f"{exp_id}_residuals.png", dpi=150, bbox_inches="tight")
     plt.show()
 
+
+def show_multiple_experiments_errors(errors_per_wvl, wavelengths, ylabel="Log10(MRE)", title="Log10(MRE) per Wavelength for Selected Models"):
+    plt.figure(figsize=(10, 6))
+    for exp_id, mre_per_wvl in errors_per_wvl.items():
+        plt.plot(wavelengths, mre_per_wvl, label=exp_id)
+    plt.xlabel("Wavelength (nm)")
+    plt.ylabel(ylabel)
+    plt.title(title)
+    plt.grid()
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
 #endregion
 
 #region GP-SPECIFIC UTILITIES
-
-n_feat = globals.N_INPUTS
-
-kern_rbf = (
-        C(1.0, (1e-3, 1e3)) *
-        RBF(length_scale=np.ones(n_feat), length_scale_bounds=(1e-3, 1e3))
-        + WhiteKernel(noise_level=1e-2, noise_level_bounds=(1e-5, 1e1))
-    )
-
-kern_matern = (
-    C(1.0, (1e-3, 1e3))
-    * Matern(
-        length_scale=np.ones(n_feat),
-        length_scale_bounds=(1e-3, 1e3),
-        nu=2.5
-    )
-    + WhiteKernel(1e-2, (1e-5, 1e1))
-)
-
-kern_rq = (
-    C(1.0, (1e-3, 1e3))
-    * RationalQuadratic(
-        length_scale=1.0,
-        alpha=1.0,
-        length_scale_bounds=(1e-3, 1e3),
-        alpha_bounds=(1e-3, 1e3)
-    )
-    + WhiteKernel(1e-2, (1e-5, 1e1))
-)
-
-kern_rbf_rq = (
-    C(1.0, (1e-3, 1e3))
-    * (
-        RBF(
-            length_scale=np.ones(n_feat),
-            length_scale_bounds=(1e-3, 1e3)
-        )
-        + RationalQuadratic(
-            length_scale=1.0,
-            alpha=1.0
-        )
-    )
-    + WhiteKernel(1e-2, (1e-5, 1e1))
-)
-
-kern_dot_rbf = (
-    C(1.0, (1e-3, 1e3))
-    * (
-        DotProduct()
-        + RBF(
-            length_scale=np.ones(n_feat),
-            length_scale_bounds=(1e-3, 1e3)
-        )
-    )
-    + WhiteKernel(1e-2, (1e-5, 1e1))
-)
-
-kern_linear = (
-    C(1.0, (1e-3, 1e3))
-    * DotProduct()
-    + WhiteKernel(1e-2, (1e-5, 1e1))
-)
-
-kern_matern_rq = (
-    C(1.0, (1e-3, 1e3))
-    * (
-        Matern(
-            length_scale=np.ones(n_feat),
-            nu=1.5
-        )
-        + RationalQuadratic()
-    )
-    + WhiteKernel(1e-2, (1e-5, 1e1))
-)
-
 
 def inverse_mean_transform(y_red_scaled, scaler, pca):
     y_red = scaler.inverse_transform(y_red_scaled)
@@ -896,10 +854,10 @@ def inverse_std_transform(std_red_scaled, scaler, pca):
 # ==================== EXPERIMENT GRID ====================
 ARCHITECTURES = {
     # "EmulatorSet1": nn_models.EmulatorSet1,
-    # "EmulatorSet2": nn_models.EmulatorSet2,
+    "EmulatorSet2": nn_models.EmulatorSet2,
     # "EmulatorSet3": nn_models.EmulatorSet3,
-    # "EmulatorSet4": nn_models.EmulatorSet4,
-    "EmulatorSet5": nn_models.EmulatorSet5
+    "EmulatorSet4": nn_models.EmulatorSet4,
+    # "EmulatorSet5": nn_models.EmulatorSet5
 }
 
 ENCODER_VERSIONS = [
@@ -1065,7 +1023,7 @@ def nn_calculate_metrics(y_pred, Y_batch, wavelengths, y_scalers, pca_list):
 
 
 # ==================== SINGLE EXPERIMENT ====================
-def nn_run_experiment(model_name, encoder_version, scale_type, config, device, wavelengths):
+def nn_run_experiment(model_name, encoder_version, scale_type, config, device, wavelengths, region_configs=None):
     dataset_size = int(re.search(r'\d+', Path(globals.CURRENT_TRAIN_FILE).stem).group())
     exp_id = f"{model_name}_{encoder_version}_{scale_type}_{dataset_size}"
     print(f"\n{'='*60}")
@@ -1075,7 +1033,7 @@ def nn_run_experiment(model_name, encoder_version, scale_type, config, device, w
     # --- build model ---
     ModelClass = ARCHITECTURES[model_name]
     if model_name == "EmulatorSet5":
-        model = ModelClass(encoder_type=encoder_version, wavelengths=wavelengths).to(device)
+        model = ModelClass(encoder_type=encoder_version, wavelengths=wavelengths, region_configs=region_configs).to(device)
     else:
         model = ModelClass(encoder_type=encoder_version).to(device)
 
@@ -1216,7 +1174,7 @@ def nn_run_experiment(model_name, encoder_version, scale_type, config, device, w
 
 
 # ==================== FULL EXPERIMENT LOOP ====================
-def nn_run_all_experiments(config, device, wavelengths):
+def nn_run_all_experiments(config, device, wavelengths, region_configs=None):
     results_path = Path("nn_saves/validation_results/nn_val_results.csv")
     all_results  = []
 
@@ -1227,7 +1185,7 @@ def nn_run_all_experiments(config, device, wavelengths):
         try:
             model, history, result = nn_run_experiment(
                 model_name, encoder_version, scale_type,
-                config, device, wavelengths
+                config, device, wavelengths, region_configs
             )
             all_results.append(result)
 

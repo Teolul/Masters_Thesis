@@ -1,7 +1,9 @@
 experiment_id,gp_kernel_full_name,model,scale_type,dataset_size,fit_time,best_val_mre,best_val_mae
-Matern_minmax_500,"1**2*Matern(length_scale=[1,1,1,1,1,1,1,1,1],nu=2.5)+WhiteKernel(noise_level=0.01)",Matern,minmax,500,12.150205373764038,0.0024477318,0.20448226
-DotProduct_minmax_500,1**2*DotProduct(sigma_0=1)+WhiteKernel(noise_level=0.01),DotProduct,minmax,500,2.3278627395629883,0.05043884,5.8869724
-Matern_minmax_500,"1**2*Matern(length_scale=[1,1,1,1,1,1,1,1,1],nu=2.5)+WhiteKernel(noise_level=0.01)",Matern,minmax,500,11.659862756729126,0.0024477318,0.20448226
-Matern_minmax_500,"1**2*Matern(length_scale=[1,1,1,1,1,1,1,1,1],nu=2.5)+WhiteKernel(noise_level=0.01)",Matern,minmax,500,12.68000841140747,0.14476942,30.439695
-Matern_no_scaling_500,"1**2*Matern(length_scale=[1,1,1,1,1,1,1,1,1],nu=2.5)+WhiteKernel(noise_level=0.01)",Matern,none,500,14.910635709762573,0.14476942,30.439695
-DotProduct_no_scaling_500,1**2*DotProduct(sigma_0=1)+WhiteKernel(noise_level=0.01),DotProduct,none,500,2.285153865814209,0.05123966,5.9273276
+Matern_minmax_500,"1**2*Matern(length_scale=[1,1,1,1,1,1,1,1,1],nu=2.5)+WhiteKernel(noise_level=0.01)",Matern,minmax,500,12.53966999053955,0.0024477318,0.20448226
+Matern_minmax_500,"1**2*Matern(length_scale=[1,1,1,1,1,1,1,1,1],nu=1.5)+WhiteKernel(noise_level=0.01)",Matern,minmax,500,10.12612271308899,0.0034440157,0.33429554
+Matern+RationalQuadratic_minmax_500,"1**2*Matern(length_scale=[1,1,1,1,1,1,1,1,1],nu=1.5)+RationalQuadratic(alpha=1,length_scale=1)+WhiteKernel(noise_level=0.01)",Matern+RationalQuadratic,minmax,500,25.479583501815796,0.003420664,0.30941233
+Matern+RationalQuadratic_minmax_500,"1**2*Matern(length_scale=[1,1,1,1,1,1,1,1,1],nu=2.5)+RationalQuadratic(alpha=1,length_scale=1)+WhiteKernel(noise_level=0.01)",Matern+RationalQuadratic,minmax,500,29.12880539894104,0.0026793748,0.2003084
+RBF+RationalQuadratic_minmax_500,"1**2*RBF(length_scale=[1,1,1,1,1,1,1,1,1])+RationalQuadratic(alpha=1,length_scale=1)+WhiteKernel(noise_level=0.01)",RBF+RationalQuadratic,minmax,500,22.89669442176819,0.0030884827,0.34216014
+Matern+RationalQuadratic_minmax_500,"1**2*Matern(length_scale=[1,1,1,1,1,1,1,1,1],nu=2.5)+RationalQuadratic(alpha=1,length_scale=1)+WhiteKernel(noise_level=0.01)",Matern+RationalQuadratic,minmax,500,44.23741936683655,0.00268556,0.20532908
+Matern+RationalQuadratic_minmax_500,"1**2*Matern(length_scale=[1,1,1,1,1,1,1,1,1],nu=1.5)+RationalQuadratic(alpha=1,length_scale=1)+WhiteKernel(noise_level=0.01)",Matern+RationalQuadratic,minmax,500,29.832011222839355,0.003419054,0.31289434
+RBF+RationalQuadratic_minmax_500,"1**2*RBF(length_scale=[1,1,1,1,1,1,1,1,1])+RationalQuadratic(alpha=1,length_scale=1)+WhiteKernel(noise_level=0.01)",RBF+RationalQuadratic,minmax,500,32.19636869430542,0.0031928443,0.34507823
