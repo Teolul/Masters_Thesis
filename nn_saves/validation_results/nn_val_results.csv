@@ -1,3 +1,4 @@
 experiment_id,model,encoder,scale_type,dataset_size,fit_time,best_epoch,best_train_loss,best_val_loss,best_train_mre,best_val_mre,best_train_mae,best_val_mae
 EmulatorSet2_single_minmax_500,EmulatorSet2,single,minmax,500,61.156036615371704,87,0.00628235025331378,0.007859871219843627,0.003963286,0.005555176,0.45778915,0.66840863
 EmulatorSet4_single_minmax_500,EmulatorSet4,single,minmax,500,81.938560962677,93,0.006026824973523617,0.008190678115934134,0.0040205913,0.005750056,0.45599544,0.5467616
+EmulatorSet5_single_minmax_500,EmulatorSet5,single,minmax,500,899.3844890594482,98,0.003784308622125536,0.004396997336298228,0.0031824028,0.0042237593,0.3600591,0.40387863
