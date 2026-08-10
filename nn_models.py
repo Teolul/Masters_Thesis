@@ -496,7 +496,7 @@ class RegionBranchingBlock(nn.Module):
  
  
 class Encoder5(nn.Module):
-    def __init__(self, z_dim=128):
+    def __init__(self, z_dim=28):
         super().__init__()
         self.block1 = ResidualFCBlock(9, 64)
         self.block2 = ResidualFCBlock(64, 128)
@@ -510,8 +510,8 @@ class Encoder5(nn.Module):
  
  
 class SpectralDecoder5(nn.Module):
-    def __init__(self, z_dim=128, channels=64, initial_length=32, spectrum_len=4205,
-                 n_global_modes=8, region_config=None, wavelengths=None):
+    def __init__(self, z_dim=28, channels=28, initial_length=32, spectrum_len=4205,
+                 n_global_modes=4, region_config=None, wavelengths=None):
         super().__init__()
         self.fc = nn.Linear(z_dim, channels * initial_length)
         self.initial_length = initial_length
@@ -519,20 +519,20 @@ class SpectralDecoder5(nn.Module):
         if wavelengths is None:
             wavelengths = torch.linspace(400.0, 2500.0, spectrum_len)
  
-        self.initial_conv = ResidualConv1D(channels, 128, kernel_size=5, stride=1, padding=2, num_groups=16, transpose=False)
+        self.initial_conv = ResidualConv1D(channels, 56, kernel_size=5, stride=1, padding=2, num_groups=4, transpose=False)
  
-        self.up1 = ResidualConv1D(128, 96, kernel_size=5, stride=2, padding=1, num_groups=16, transpose=True)
-        self.up2 = ResidualConv1D(96, 64, kernel_size=5, stride=2, padding=1, num_groups=8, transpose=True)
-        self.up3 = ResidualConv1D(64, 32, kernel_size=5, stride=2, padding=1, num_groups=8, transpose=True)
-        self.up4 = ResidualConv1D(32, 24, kernel_size=5, stride=2, padding=2, num_groups=8, transpose=True)
-        self.up5 = ResidualConv1D(24, 16, kernel_size=5, stride=2, padding=1, num_groups=4, transpose=True)
-        self.up6 = ResidualConv1D(16, 12, kernel_size=5, stride=2, padding=1, num_groups=4, transpose=True)
+        self.up1 = ResidualConv1D(56, 40, kernel_size=5, stride=2, padding=1, num_groups=4, transpose=True)
+        self.up2 = ResidualConv1D(40, 28, kernel_size=5, stride=2, padding=1, num_groups=4, transpose=True)
+        self.up3 = ResidualConv1D(28, 16, kernel_size=5, stride=2, padding=1, num_groups=4, transpose=True)
+        self.up4 = ResidualConv1D(16, 12, kernel_size=5, stride=2, padding=2, num_groups=4, transpose=True)
+        self.up5 = ResidualConv1D(12, 8, kernel_size=5, stride=2, padding=1, num_groups=4, transpose=True)
+        self.up6 = ResidualConv1D(8, 8, kernel_size=5, stride=2, padding=1, num_groups=4, transpose=True)
  
         # last-mile stage: region-specific (kernel, padding) branches instead
         # of a single global up7 + final_conv. Defaults to one region
         # (kernel=5) if no region_config is given
         self.final_stage = RegionBranchingBlock(
-            in_ch=12, mid_ch=8, in_len=2103, wavelengths=wavelengths,
+            in_ch=8, mid_ch=4, in_len=2103, wavelengths=wavelengths,
             regions=region_config or [(wavelengths[0].item(), wavelengths[-1].item(), 5)],
             num_groups=4,
         )

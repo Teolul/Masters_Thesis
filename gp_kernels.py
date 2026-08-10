@@ -81,3 +81,13 @@ kern_matern_rq = (
     )
     + WhiteKernel(1e-2, (1e-5, 1e1))
 )
+
+kern_matern_iso = (
+    C(1.0, (1e-3, 1e3))
+    * Matern(
+        length_scale=1.0,
+        length_scale_bounds=(1e-3, 1e3),
+        nu=2.5
+    )
+    + WhiteKernel(1e-2, (1e-5, 1e1))
+)

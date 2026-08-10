@@ -1,4 +1,5 @@
 from pathlib import Path
+import random
 import re
 import os
 import h5py
@@ -1023,7 +1024,7 @@ def nn_calculate_metrics(y_pred, Y_batch, wavelengths, y_scalers, pca_list):
 
 
 # ==================== SINGLE EXPERIMENT ====================
-def nn_run_experiment(model_name, encoder_version, scale_type, config, device, wavelengths, region_configs=None):
+def nn_run_experiment(model_name, encoder_version, scale_type, config, device, wavelengths, region_configs=None, seed=42):
     dataset_size = int(re.search(r'\d+', Path(globals.CURRENT_TRAIN_FILE).stem).group())
     exp_id = f"{model_name}_{encoder_version}_{scale_type}_{dataset_size}"
     print(f"\n{'='*60}")
@@ -1147,11 +1148,18 @@ def nn_run_experiment(model_name, encoder_version, scale_type, config, device, w
 
     # persist model
     os.makedirs("nn_saves", exist_ok=True)
-    torch.save(model.state_dict(), f"nn_saves/model_saves/{exp_id}.pth")
+    if seed == 42:
+        torch.save(model.state_dict(), f"nn_saves/model_saves/{exp_id}.pth")
+    else:
+        torch.save(model.state_dict(), f"nn_saves/model_saves_uncertainty/{exp_id}_{seed}.pth")
 
     # save history
-    with open(f"nn_saves/model_saves/{exp_id}_history.pkl", "wb") as f:
-        pickle.dump(history, f)
+    if seed == 42:
+        with open(f"nn_saves/model_saves/{exp_id}_history.pkl", "wb") as f:
+            pickle.dump(history, f)
+    else:
+        with open(f"nn_saves/model_saves_uncertainty/{exp_id}_{seed}_history.pkl", "wb") as f:
+            pickle.dump(history, f)
 
     # build result row
     idx_best = int(np.argmin(history["val_mre"]))
@@ -1174,8 +1182,17 @@ def nn_run_experiment(model_name, encoder_version, scale_type, config, device, w
 
 
 # ==================== FULL EXPERIMENT LOOP ====================
-def nn_run_all_experiments(config, device, wavelengths, region_configs=None):
-    results_path = Path("nn_saves/validation_results/nn_val_results.csv")
+def nn_run_all_experiments(config, device, wavelengths, region_configs=None, seed=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+    if seed == 42:
+        results_path = Path("nn_saves/validation_results/nn_val_results.csv")
+    else:
+        results_path = Path("nn_saves/validation_results/nn_val_results_uncertainty.csv")
     all_results  = []
 
     grid = list(itertools.product(ARCHITECTURES.keys(), ENCODER_VERSIONS, SCALE_TYPES))
@@ -1185,7 +1202,7 @@ def nn_run_all_experiments(config, device, wavelengths, region_configs=None):
         try:
             model, history, result = nn_run_experiment(
                 model_name, encoder_version, scale_type,
-                config, device, wavelengths, region_configs
+                config, device, wavelengths, region_configs, seed
             )
             all_results.append(result)
 
