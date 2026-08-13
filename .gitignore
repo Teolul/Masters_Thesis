@@ -1,2 +1,4 @@
-*pth
+*.pth
 gpr_list_nodimred.pkl
+gp_saves/model_saves/*.pkl
+gp_saves/validation_results/*.pkl
