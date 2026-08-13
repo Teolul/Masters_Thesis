@@ -9,6 +9,7 @@ TRAIN_FILE_A_2000 = ROOT / "scenarioA" / "train" / "train2000.h5"
 TRAIN_FILE_A_10000 = ROOT / "scenarioA" / "train" / "train10000.h5"
 TEST_FILE_A_INTERP = ROOT / "scenarioA" / "reference" / "refInterp.h5"
 TEST_FILE_A_EXTRAP = ROOT / "scenarioA" / "reference" / "refExtrap.h5"
+REF_LDB = ROOT / "scenarioA" / "reference" / "refldb.txt"
 
 # "current" selection (mutable state)
 CURRENT_TRAIN_FILE = TRAIN_FILE_A_500
