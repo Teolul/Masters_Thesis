@@ -578,7 +578,7 @@ def show_fit_val_summary(results_df, title="Results Summary", save_path="nn_save
     axes[2].set_axisbelow(True)
 
     plt.tight_layout()
-    plt.savefig(save_path, dpi=150, bbox_inches="tight")
+    plt.savefig(save_path, dpi=300, bbox_inches="tight")
     plt.show()
     print(f"\nFigure saved to {save_path}")
 
@@ -727,7 +727,7 @@ def show_test_summary(results_df, title="Results Summary", save_path="nn_saves/n
     axes[2].set_axisbelow(True)
 
     plt.tight_layout()
-    plt.savefig(save_path, dpi=150, bbox_inches="tight")
+    plt.savefig(save_path, dpi=300, bbox_inches="tight")
     plt.show()
     print(f"\nFigure saved to {save_path}")
 
@@ -780,7 +780,7 @@ def show_barplot_results(results_df, title="Bar Plot of Results", save_path="nn_
     plt.title(title)
     plt.xticks(range(len(results_sorted)), results_sorted["experiment_id"], rotation=90)
     plt.tight_layout()
-    plt.savefig(save_path, dpi=150, bbox_inches="tight")
+    plt.savefig(save_path, dpi=300, bbox_inches="tight")
     plt.show()
     print(f"\nBar plot saved to {save_path}")
 
@@ -814,7 +814,7 @@ def show_test_results_mre(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_pat
     axes[1].set_title("MRE per Wavelength (Zoomed)")
     axes[1].grid()
     plt.tight_layout()
-    plt.savefig(save_path + f"{exp_id}_mre_wavelengths.png", dpi=150, bbox_inches="tight")
+    plt.savefig(save_path + f"{exp_id}_mre_wavelengths.png", dpi=300, bbox_inches="tight")
     plt.show()
 
     # ---MRE PER WAVELENGTH LOG---
@@ -827,7 +827,7 @@ def show_test_results_mre(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_pat
     plt.title("Log10(MRE) per Wavelength")
     plt.grid()
     plt.tight_layout()
-    plt.savefig(save_path + f"{exp_id}_mre_wavelengths_log.png", dpi=150, bbox_inches="tight")
+    plt.savefig(save_path + f"{exp_id}_mre_wavelengths_log.png", dpi=300, bbox_inches="tight")
     plt.show()
 
     # ---MRE PER WAVELENGTH LOG ZOOMED---
@@ -841,7 +841,7 @@ def show_test_results_mre(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_pat
     plt.title("Log10(MRE) per Wavelength (Zoomed)")
     plt.grid()
     plt.tight_layout()
-    plt.savefig(save_path + f"{exp_id}_mre_wavelengths_log_zoomed.png", dpi=150, bbox_inches="tight")
+    plt.savefig(save_path + f"{exp_id}_mre_wavelengths_log_zoomed.png", dpi=300, bbox_inches="tight")
     plt.show()
 
     # ---MRE PER WAVELENGTH LOG ABSORPTIONS---
@@ -856,7 +856,7 @@ def show_test_results_mre(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_pat
     plt.title("Log10(MRE) per Wavelength (Absorptions)")
     plt.grid()
     plt.tight_layout()
-    plt.savefig(save_path + f"{exp_id}_mre_wavelengths_log_absorptions.png", dpi=150, bbox_inches="tight")
+    plt.savefig(save_path + f"{exp_id}_mre_wavelengths_log_absorptions.png", dpi=300, bbox_inches="tight")
     plt.show()
 
     # ---MRE PER FUNCTION PER WAVELENGTH ZOOMED---
@@ -872,7 +872,7 @@ def show_test_results_mre(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_pat
         axes[i].set_title(f"MRE for {globals.function_names_plots[i]} per wavelength")
         axes[i].grid()
     plt.tight_layout()
-    plt.savefig(save_path + f"{exp_id}_mre_functions.png", dpi=150, bbox_inches="tight")
+    plt.savefig(save_path + f"{exp_id}_mre_functions.png", dpi=300, bbox_inches="tight")
     plt.show()
 
     # ---MRE PER FUNCTION PER WAVELENGTH LOG---
@@ -888,7 +888,7 @@ def show_test_results_mre(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_pat
         axes[i].set_title(f"Log10(MRE) for {globals.function_names_plots[i]} per wavelength")
         axes[i].grid()
     plt.tight_layout()
-    plt.savefig(save_path + f"{exp_id}_mre_functions_log.png", dpi=150, bbox_inches="tight")
+    plt.savefig(save_path + f"{exp_id}_mre_functions_log.png", dpi=300, bbox_inches="tight")
     plt.show()
 
     # ---MRE PER FUNCTION PER WAVELENGTH LOG ZOOMED---
@@ -904,7 +904,7 @@ def show_test_results_mre(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_pat
         axes[i].set_title(f"Log10(MRE) for {globals.function_names_plots[i]} per wavelength (Zoomed)")
         axes[i].grid()
     plt.tight_layout()
-    plt.savefig(save_path + f"{exp_id}_mre_functions_log_zoomed.png", dpi=150, bbox_inches="tight")
+    plt.savefig(save_path + f"{exp_id}_mre_functions_log_zoomed.png", dpi=300, bbox_inches="tight")
     plt.show()
 
     file_path = save_path + "mre_per_wvl_log.pkl"
@@ -941,7 +941,7 @@ def show_test_results_mae(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_pat
     plt.ylabel("MAE")
     plt.title("MAE per wavelength")
     plt.grid()
-    plt.savefig(save_path + f"{exp_id}_mae_wavelengths.png", dpi=150, bbox_inches="tight")
+    plt.savefig(save_path + f"{exp_id}_mae_wavelengths.png", dpi=300, bbox_inches="tight")
     plt.show()
 
     mae_per_func_wvl = mae_score(y_test, y_pred, wavelengths, axis=0)
@@ -955,7 +955,7 @@ def show_test_results_mae(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_pat
         axes[i].set_title(f"MAE for {globals.function_names_plots[i]} per wavelength")
         axes[i].grid()
     plt.tight_layout()
-    plt.savefig(save_path + f"{exp_id}_mae_functions.png", dpi=150, bbox_inches="tight")
+    plt.savefig(save_path + f"{exp_id}_mae_functions.png", dpi=300, bbox_inches="tight")
     plt.show()
 
     file_path = save_path + "mae_per_wvl.pkl"
@@ -1002,7 +1002,7 @@ def show_predicted_vs_true(y_test, y_pred, y_std, wavelengths, exp_id="EXP_ID", 
         plt.legend()
 
     plt.tight_layout()
-    plt.savefig(save_path + f"{exp_id}_predicted_vs_true.png", dpi=150, bbox_inches="tight")
+    plt.savefig(save_path + f"{exp_id}_predicted_vs_true.png", dpi=300, bbox_inches="tight")
     plt.show()
 
 
@@ -1031,7 +1031,7 @@ def show_residuals(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_path="nn_s
         plt.ylabel("Prediction Error")
 
     plt.tight_layout()
-    plt.savefig(save_path + f"{exp_id}_residuals.png", dpi=150, bbox_inches="tight")
+    plt.savefig(save_path + f"{exp_id}_residuals.png", dpi=300, bbox_inches="tight")
     plt.show()
 
 
