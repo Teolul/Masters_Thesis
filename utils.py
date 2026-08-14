@@ -463,11 +463,11 @@ def show_fit_val_summary(results_df, title="Results Summary", save_path="nn_save
     avg_val_mre = (
         plot_results_df.groupby(["dataset_size", "model"])["best_val_mre"]
         .mean()
-        .rename("avg_best_val_mre")
+        .rename("avg_val_mre")
         .reset_index()
     )
     print("\n" + "=" * 60)
-    print("Average Best Val MRE by Dataset Size & Model")
+    print("Average Val MRE by Dataset Size & Model")
     print("=" * 60)
     print(avg_val_mre.to_string(index=False))
 
@@ -476,11 +476,11 @@ def show_fit_val_summary(results_df, title="Results Summary", save_path="nn_save
     avg_val_mae = (
         plot_results_df.groupby(["dataset_size", "model"])["best_val_mae"]
         .mean()
-        .rename("avg_best_val_mae")
+        .rename("avg_val_mae")
         .reset_index()
     )
     print("\n" + "=" * 60)
-    print("Average Best Val MAE by Dataset Size & Model")
+    print("Average Val MAE by Dataset Size & Model")
     print("=" * 60)
     print(avg_val_mae.to_string(index=False))
 
@@ -490,14 +490,14 @@ def show_fit_val_summary(results_df, title="Results Summary", save_path="nn_save
         plot_results_df.groupby("model")[["best_val_mre", "best_val_mae"]]
         .mean()
         .rename(columns={
-            "best_val_mre": "avg_best_val_mre",
-            "best_val_mae": "avg_best_val_mae"
+            "best_val_mre": "avg_val_mre",
+            "best_val_mae": "avg_val_mae"
         })
         .reset_index()
     )
 
     print("\n" + "=" * 60)
-    print("Average Best Val MRE & MAE by Model (Across Dataset Sizes)")
+    print("Average Val MRE & MAE by Model (Across Dataset Sizes)")
     print("=" * 60)
     print(avg_metrics_by_model.to_string(index=False))
 
@@ -507,14 +507,14 @@ def show_fit_val_summary(results_df, title="Results Summary", save_path="nn_save
         plot_results_df.groupby("dataset_size")[["best_val_mre", "best_val_mae"]]
         .mean()
         .rename(columns={
-            "best_val_mre": "avg_best_val_mre",
-            "best_val_mae": "avg_best_val_mae"
+            "best_val_mre": "avg_val_mre",
+            "best_val_mae": "avg_val_mae"
         })
         .reset_index()
     )
 
     print("\n" + "=" * 60)
-    print("Average Best Val MRE & MAE by Dataset Size (Across Models)")
+    print("Average Val MRE & MAE by Dataset Size (Across Models)")
     print("=" * 60)
     print(avg_metrics_by_dataset_size.to_string(index=False))
 
@@ -524,8 +524,8 @@ def show_fit_val_summary(results_df, title="Results Summary", save_path="nn_save
     dataset_sizes = sorted(plot_results_df["dataset_size"].unique())
 
     # pivot tables for grouped bars
-    mre_pivot = avg_val_mre.pivot(index="dataset_size", columns="model", values="avg_best_val_mre")
-    mae_pivot = avg_val_mae.pivot(index="dataset_size", columns="model", values="avg_best_val_mae")
+    mre_pivot = avg_val_mre.pivot(index="dataset_size", columns="model", values="avg_val_mre")
+    mae_pivot = avg_val_mae.pivot(index="dataset_size", columns="model", values="avg_val_mae")
     fit_pivot = avg_fit_time.set_index("dataset_size")[["avg_fit_time"]]
 
     fig, axes = plt.subplots(1, 3, figsize=(18, 9))
@@ -557,10 +557,10 @@ def show_fit_val_summary(results_df, title="Results Summary", save_path="nn_save
 
 
     # panel 1 — pal MRE
-    _grouped_bars(axes[0], mre_pivot, "Avg Best Val MRE", "Validation MRE by Model & Dataset Size")
+    _grouped_bars(axes[0], mre_pivot, "Avg Val MRE", "Validation MRE by Model & Dataset Size")
 
     # panel 2 — pal MAE
-    _grouped_bars(axes[1], mae_pivot, "Avg Best Val MAE", "Validation MAE by Model & Dataset Size")
+    _grouped_bars(axes[1], mae_pivot, "Avg Val MAE", "Validation MAE by Model & Dataset Size")
 
     # panel 3 — fit time (single series, no model split)
     fit_vals = [fit_pivot.loc[s, "avg_fit_time"] for s in dataset_sizes]
@@ -583,15 +583,171 @@ def show_fit_val_summary(results_df, title="Results Summary", save_path="nn_save
     print(f"\nFigure saved to {save_path}")
 
 
+def show_test_summary(results_df, title="Results Summary", save_path="nn_saves/nn_results_analysis.png"):
+    if results_df["experiment_id"].str.startswith("DotProduct_", na=False).any():
+        plot_results_df = results_df[
+            ~results_df["experiment_id"].str.startswith("DotProduct_", na=False)
+        ]
+    else:
+        plot_results_df = results_df.copy()
+
+    # ── average inference time per dataset size ──────────────────────────────
+    if "gp_kernel_full_name" in results_df.columns:
+        results_df_time = results_df[~results_df["experiment_id"].str.startswith(("combined", "GP"), na=False)]
+    else:
+        results_df_time = results_df.copy()
+
+    avg_inference_time = (
+        results_df_time.groupby("dataset_size")["inference_time"]
+        .mean()
+        .rename("avg_inference_time")
+        .reset_index()
+    )
+    print("=" * 60)
+    print("Average Inference Time by Dataset Size")
+    print("=" * 60)
+    print(avg_inference_time.to_string(index=False))
+
+    # ── average best_val_mre per dataset size AND model ───────────────────────
+    avg_test_mre = (
+        plot_results_df.groupby(["dataset_size", "model"])["test_mre"]
+        .mean()
+        .rename("avg_test_mre")
+        .reset_index()
+    )
+    print("\n" + "=" * 60)
+    print("Average Test MRE by Dataset Size & Model")
+    print("=" * 60)
+    print(avg_test_mre.to_string(index=False))
+
+
+    # ── average best_val_mae per dataset size AND model ───────────────────────
+    avg_test_mae = (
+        plot_results_df.groupby(["dataset_size", "model"])["test_mae"]
+        .mean()
+        .rename("avg_test_mae")
+        .reset_index()
+    )
+    print("\n" + "=" * 60)
+    print("Average Test MAE by Dataset Size & Model")
+    print("=" * 60)
+    print(avg_test_mae.to_string(index=False))
+
+
+    # ── average best_val_mre and best_val_mae per model (across all dataset sizes) ──
+    avg_metrics_by_model = (
+        plot_results_df.groupby("model")[["test_mre", "test_mae"]]
+        .mean()
+        .rename(columns={
+            "test_mre": "avg_test_mre",
+            "test_mae": "avg_test_mae"
+        })
+        .reset_index()
+    )
+
+    print("\n" + "=" * 60)
+    print("Average Test MRE & MAE by Model (Across Dataset Sizes)")
+    print("=" * 60)
+    print(avg_metrics_by_model.to_string(index=False))
+
+
+    # ── average test_mre and test_mae per dataset size (across models) ──
+    avg_metrics_by_dataset_size = (
+        plot_results_df.groupby("dataset_size")[["test_mre", "test_mae"]]
+        .mean()
+        .rename(columns={
+            "test_mre": "avg_test_mre",
+            "test_mae": "avg_test_mae"
+        })
+        .reset_index()
+    )
+
+    print("\n" + "=" * 60)
+    print("Average Test MRE & MAE by Dataset Size (Across Models)")
+    print("=" * 60)
+    print(avg_metrics_by_dataset_size.to_string(index=False))
+
+
+    # ── visualisation ─────────────────────────────────────────────────────────
+    models       = sorted(plot_results_df["model"].unique())
+    dataset_sizes = sorted(plot_results_df["dataset_size"].unique())
+
+    # pivot tables for grouped bars
+    mre_pivot = avg_test_mre.pivot(index="dataset_size", columns="model", values="avg_test_mre")
+    mae_pivot = avg_test_mae.pivot(index="dataset_size", columns="model", values="avg_test_mae")
+    inf_pivot = avg_inference_time.set_index("dataset_size")[["avg_inference_time"]]
+
+    fig, axes = plt.subplots(1, 3, figsize=(18, 9))
+    fig.suptitle(title, fontsize=14, y=1.02)
+
+    x      = np.arange(len(dataset_sizes))
+    n_mdl  = len(models)
+    width  = 0.10
+    offsets = np.linspace(-(n_mdl - 1) / 2, (n_mdl - 1) / 2, n_mdl) * width
+
+
+    def _grouped_bars(ax, pivot, ylabel, title):
+        for i, mdl in enumerate(models):
+            vals = pivot[mdl].values if mdl in pivot.columns else np.zeros(len(dataset_sizes))
+            bars = ax.bar(x + offsets[i], vals, width, label=mdl,
+                        alpha=0.88, linewidth=0)
+            for bar in bars:
+                h = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width() / 2, h * 1.015,
+                        f"{h:.4f}", ha="center", va="bottom", fontsize=6, rotation=25)
+        ax.set_xticks(x)
+        ax.set_xticklabels([str(s) for s in dataset_sizes])
+        ax.set_xlabel("Dataset Size")
+        ax.set_ylabel(ylabel)
+        ax.set_title(title, fontweight="bold", pad=10)
+        ax.yaxis.grid(True)
+        ax.set_axisbelow(True)
+        ax.legend(fontsize=7.5, loc="upper right")
+
+
+    # panel 1 — pal MRE
+    _grouped_bars(axes[0], mre_pivot, "Avg Test MRE", "Test MRE by Model & Dataset Size")
+
+    # panel 2 — pal MAE
+    _grouped_bars(axes[1], mae_pivot, "Avg Test MAE", "Test MAE by Model & Dataset Size")
+
+    # panel 3 — inference time (single series, no model split)
+    inf_vals = [inf_pivot.loc[s, "avg_inference_time"] for s in dataset_sizes]
+    bars = axes[2].bar(x, inf_vals, width=0.45, alpha=0.88, linewidth=0)
+    for bar in bars:
+        h = bar.get_height()
+        axes[2].text(bar.get_x() + bar.get_width() / 2, h * 1.015,
+                    f"{h:.3f}s", ha="center", va="bottom", fontsize=8.5)
+    axes[2].set_xticks(x)
+    axes[2].set_xticklabels([str(s) for s in dataset_sizes])
+    axes[2].set_xlabel("Dataset Size")
+    axes[2].set_ylabel("Avg Inference Time (s)")
+    axes[2].set_title("Average Inference Time by Dataset Size", fontweight="bold", pad=10)
+    axes[2].yaxis.grid(True)
+    axes[2].set_axisbelow(True)
+
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150, bbox_inches="tight")
+    plt.show()
+    print(f"\nFigure saved to {save_path}")
+
+
 def show_top_results(results_df, top_n=5):
     """
     Show the top N results based on best_val_mre
     - inputs: results dataframe, number of top results to show
     - outputs: prints the top N results
     """
-    print(f"\nTop {top_n} Results by Best Validation MRE:")
+    print(f"\nTop {top_n} Results by Best MRE:")
     print("=" * 60)
-    top_results = results_df.nsmallest(top_n, "best_val_mre")
+    
+    mre_to_consider = ""
+    if "best_val_mre" not in results_df.columns:
+        mre_to_consider = "test_mre"
+    elif "test_mre" not in results_df.columns:
+        mre_to_consider = "best_val_mre"
+
+    top_results = results_df.nsmallest(top_n, mre_to_consider)
     print(top_results.to_string(index=False))
 
 
@@ -608,10 +764,17 @@ def show_barplot_results(results_df, title="Bar Plot of Results", save_path="nn_
         ]
     else:
         plot_results_df = results_df.copy()
-    results_sorted = plot_results_df.sort_values("best_val_mre", ascending=True)
+
+    mre_to_consider = ""
+    if "best_val_mre" not in results_df.columns:
+        mre_to_consider = "test_mre"
+    elif "test_mre" not in results_df.columns:
+        mre_to_consider = "best_val_mre"
+
+    results_sorted = plot_results_df.sort_values(mre_to_consider, ascending=True)
 
     plt.figure(figsize=(12, 6))
-    plt.bar(range(len(results_sorted)), results_sorted["best_val_mre"], color="skyblue")
+    plt.bar(range(len(results_sorted)), results_sorted[mre_to_consider], color="skyblue")
     plt.xlabel("Parameter Combination ID")
     plt.ylabel("Val MRE")
     plt.title(title)
@@ -635,6 +798,7 @@ def show_test_results_mre(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_pat
     for i in range(globals.N_FUNCTIONS):
         print(f"{globals.function_names_plots[i]} MRE: {mre_per_func[i]:.4f}")
 
+    # ---MRE PER WAVELENGTH AND ZOOMED---
     mre_per_wvl = mre_score(y_test, y_pred, wavelengths, axis=1)
     fig, axes = plt.subplots(1, 2, figsize=(20, 5))
     plt.suptitle(exp_id, fontsize=16, y=1.02)
@@ -653,7 +817,7 @@ def show_test_results_mre(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_pat
     plt.savefig(save_path + f"{exp_id}_mre_wavelengths.png", dpi=150, bbox_inches="tight")
     plt.show()
 
-    # MRE per wavelength again but in log scale to better visualize small values
+    # ---MRE PER WAVELENGTH LOG---
     mre_per_wvl_log = np.log10(mre_per_wvl + 1e-10)  # add small value to avoid log(0)
     plt.figure(figsize=(10, 6))
     plt.suptitle(exp_id, fontsize=16, y=1.02)
@@ -666,7 +830,7 @@ def show_test_results_mre(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_pat
     plt.savefig(save_path + f"{exp_id}_mre_wavelengths_log.png", dpi=150, bbox_inches="tight")
     plt.show()
 
-    # MRE per wavelength log zoomed
+    # ---MRE PER WAVELENGTH LOG ZOOMED---
     mre_per_wvl_log = np.log10(mre_per_wvl + 1e-10)  # add small value to avoid log(0)
     plt.figure(figsize=(10, 6))
     plt.suptitle(exp_id, fontsize=16, y=1.02)
@@ -680,6 +844,22 @@ def show_test_results_mre(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_pat
     plt.savefig(save_path + f"{exp_id}_mre_wavelengths_log_zoomed.png", dpi=150, bbox_inches="tight")
     plt.show()
 
+    # ---MRE PER WAVELENGTH LOG ABSORPTIONS---
+    mre_per_wvl_log = np.log10(mre_per_wvl + 1e-10)  # add small value to avoid log(0)
+    plt.figure(figsize=(10, 6))
+    plt.suptitle(exp_id, fontsize=16, y=1.02)
+    plt.plot(wavelengths, mre_per_wvl_log)
+    plt.xlabel("Wavelength (nm)")
+    plt.ylabel("Log10(MRE)")
+    plt.xlim(600, 1250)
+    plt.ylim(-3.5, 0)
+    plt.title("Log10(MRE) per Wavelength (Absorptions)")
+    plt.grid()
+    plt.tight_layout()
+    plt.savefig(save_path + f"{exp_id}_mre_wavelengths_log_absorptions.png", dpi=150, bbox_inches="tight")
+    plt.show()
+
+    # ---MRE PER FUNCTION PER WAVELENGTH ZOOMED---
     mre_per_func_wvl = mre_score(y_test, y_pred, wavelengths, axis=0)
     fig, axes = plt.subplots(2, 3, figsize=(18, 10))
     plt.suptitle(exp_id, fontsize=16, y=1.02)
@@ -695,7 +875,7 @@ def show_test_results_mre(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_pat
     plt.savefig(save_path + f"{exp_id}_mre_functions.png", dpi=150, bbox_inches="tight")
     plt.show()
 
-    # MRE per function again but in log scale to better visualize small values
+    # ---MRE PER FUNCTION PER WAVELENGTH LOG---
     mre_per_func_wvl_log = np.log10(mre_per_func_wvl + 1e-10)  # add small value to avoid log(0)
     fig, axes = plt.subplots(2, 3, figsize=(18, 10))
     plt.suptitle(exp_id, fontsize=16, y=1.02)
@@ -704,10 +884,27 @@ def show_test_results_mre(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_pat
         axes[i].plot(wavelengths, mre_per_func_wvl_log[i])
         axes[i].set_xlabel("Wavelength (nm)")
         axes[i].set_ylabel("Log10(MRE)")
+        axes[i].set_ylim(-6, 6)
         axes[i].set_title(f"Log10(MRE) for {globals.function_names_plots[i]} per wavelength")
         axes[i].grid()
     plt.tight_layout()
     plt.savefig(save_path + f"{exp_id}_mre_functions_log.png", dpi=150, bbox_inches="tight")
+    plt.show()
+
+    # ---MRE PER FUNCTION PER WAVELENGTH LOG ZOOMED---
+    mre_per_func_wvl_log = np.log10(mre_per_func_wvl + 1e-10)  # add small value to avoid log(0)
+    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+    plt.suptitle(exp_id, fontsize=16, y=1.02)
+    axes = axes.flatten()
+    for i in range(globals.N_FUNCTIONS):
+        axes[i].plot(wavelengths, mre_per_func_wvl_log[i])
+        axes[i].set_xlabel("Wavelength (nm)")
+        axes[i].set_ylabel("Log10(MRE)")
+        axes[i].set_ylim(-5, 1.5)
+        axes[i].set_title(f"Log10(MRE) for {globals.function_names_plots[i]} per wavelength (Zoomed)")
+        axes[i].grid()
+    plt.tight_layout()
+    plt.savefig(save_path + f"{exp_id}_mre_functions_log_zoomed.png", dpi=150, bbox_inches="tight")
     plt.show()
 
     file_path = save_path + "mre_per_wvl_log.pkl"
