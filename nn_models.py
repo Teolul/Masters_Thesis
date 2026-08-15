@@ -100,58 +100,11 @@ class EmulatorSet1(nn.Module):
             
         # return prediction as one tensor of shape (N, 6, 4205)
         return torch.stack(outputs, dim=1)
-    
 
-# 2nd ARCHITECTURE: directly predict the PCA coefficients for each function from the latent space with MLP, without upsampling convolutions
-class SpectralDecoder2(nn.Module):
-    def __init__(self, z_dim=128, n_components=10):
-        super().__init__()
-        # map the latent space to the PCA coefficients
-        self.net = nn.Sequential(
-            nn.Linear(z_dim, 256),
-            nn.SiLU(),
-            nn.Linear(256, 128),
-            nn.SiLU(),
-            nn.Linear(128, n_components) # output shape: (N, 10)
-        )
 
-    def forward(self, z):
-        return self.net(z)
-
-class EmulatorSet2(nn.Module):
-    def __init__(self, encoder_type="single", n_components=10):
-        super().__init__()
-        self.encoder_type = encoder_type
-        if encoder_type == "single":
-            self.encoder = Encoder()
-        else:
-            self.encoder = nn.ModuleList([
-                Encoder() for _ in range(globals.N_FUNCTIONS)
-            ])
-        
-        self.decoders = nn.ModuleList([
-            SpectralDecoder2(z_dim=128, n_components=n_components) for _ in range(globals.N_FUNCTIONS)
-        ])
-
-    def forward(self, x):
-        if self.encoder_type == "single":
-            z = self.encoder(x)
-            outputs = [
-                decoder(z)
-                for decoder in self.decoders
-            ]
-        else:
-            outputs = [
-                decoder(encoder(x))
-                for encoder, decoder in zip(self.encoder, self.decoders)
-            ]
-        # return prediction as one tensor of shape (N, 6, 10) - PCA coefficients for each function
-        return torch.stack(outputs, dim=1)
-    
-
-# 3rd ARCHITECTURE: add convolutional processing to the latent space before predicting PCA coefficients, to allow the model to learn local relationships in the structured sequence space
+# 2nd ARCHITECTURE: add convolutional processing to the latent space before predicting PCA coefficients, to allow the model to learn local relationships in the structured sequence space
 # technically wrong, as the PCA-reduced space doesn't have a true spatial structure, but it allows us to experiment with convolutional processing
-class SpectralDecoder3(nn.Module):
+class SpectralDecoder2(nn.Module):
     def __init__(self, z_dim=128, n_components=10, initial_length=32, channels=16):
         super().__init__()
         self.initial_length = initial_length
@@ -188,6 +141,54 @@ class SpectralDecoder3(nn.Module):
         pca_coefficients = self.to_pca(x)
         return pca_coefficients
     
+class EmulatorSet2(nn.Module):
+    def __init__(self, encoder_type="single", n_components=10):
+        super().__init__()
+        self.encoder_type = encoder_type
+        if encoder_type == "single":
+            self.encoder = Encoder()
+        else:
+            self.encoder = nn.ModuleList([
+                Encoder() for _ in range(globals.N_FUNCTIONS)
+            ])
+        
+        self.decoders = nn.ModuleList([
+            SpectralDecoder2(z_dim=128, n_components=n_components) 
+            for _ in range(globals.N_FUNCTIONS)
+        ])
+
+    def forward(self, x):
+        if self.encoder_type == "single":
+            z = self.encoder(x)
+            outputs = [
+                decoder(z)
+                for decoder in self.decoders
+            ]
+        else:
+            outputs = [
+                decoder(encoder(x))
+                for encoder, decoder in zip(self.encoder, self.decoders)
+            ]
+        # return prediction as one tensor of shape (N, 6, 10) - PCA coefficients for each function
+        return torch.stack(outputs, dim=1)
+
+
+# 3rd ARCHITECTURE: directly predict the PCA coefficients for each function from the latent space with MLP, without upsampling convolutions
+class SpectralDecoder3(nn.Module):
+    def __init__(self, z_dim=128, n_components=10):
+        super().__init__()
+        # map the latent space to the PCA coefficients
+        self.net = nn.Sequential(
+            nn.Linear(z_dim, 256),
+            nn.SiLU(),
+            nn.Linear(256, 128),
+            nn.SiLU(),
+            nn.Linear(128, n_components) # output shape: (N, 10)
+        )
+
+    def forward(self, z):
+        return self.net(z)
+
 class EmulatorSet3(nn.Module):
     def __init__(self, encoder_type="single", n_components=10):
         super().__init__()
@@ -200,8 +201,7 @@ class EmulatorSet3(nn.Module):
             ])
         
         self.decoders = nn.ModuleList([
-            SpectralDecoder3(z_dim=128, n_components=n_components) 
-            for _ in range(globals.N_FUNCTIONS)
+            SpectralDecoder3(z_dim=128, n_components=n_components) for _ in range(globals.N_FUNCTIONS)
         ])
 
     def forward(self, x):
