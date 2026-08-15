@@ -1078,21 +1078,21 @@ def inverse_std_transform(std_red_scaled, scaler, pca):
 
 # ==================== EXPERIMENT GRID ====================
 ARCHITECTURES = {
-    # "EmulatorSet1": nn_models.EmulatorSet1,
-    # "EmulatorSet2": nn_models.EmulatorSet2,
-    # "EmulatorSet3": nn_models.EmulatorSet3,
-    # "EmulatorSet4": nn_models.EmulatorSet4,
-    "EmulatorSet5": nn_models.EmulatorSet5
+    "EmulatorSet1": nn_models.EmulatorSet1,
+    "EmulatorSet2": nn_models.EmulatorSet2,
+    "EmulatorSet3": nn_models.EmulatorSet3,
+    "EmulatorSet4": nn_models.EmulatorSet4,
+    # "EmulatorSet5": nn_models.EmulatorSet5
 }
 
 ENCODER_VERSIONS = [
     "single",
-    # "multi",
+    "multi",
 ]
 
 SCALE_TYPES = [
     "minmax", 
-    # "standard",
+    "standard",
 ]
 
 # which model families use the full dataset vs. the reduced one
