@@ -1078,21 +1078,21 @@ def inverse_std_transform(std_red_scaled, scaler, pca):
 
 # ==================== EXPERIMENT GRID ====================
 ARCHITECTURES = {
-    # "EmulatorSet1": nn_models.EmulatorSet1,
-    # "EmulatorSet2": nn_models.EmulatorSet2,
-    # "EmulatorSet3": nn_models.EmulatorSet3,
+    "EmulatorSet1": nn_models.EmulatorSet1,
+    "EmulatorSet2": nn_models.EmulatorSet2,
+    "EmulatorSet3": nn_models.EmulatorSet3,
     "EmulatorSet4": nn_models.EmulatorSet4,
     # "EmulatorSet5": nn_models.EmulatorSet5
 }
 
 ENCODER_VERSIONS = [
-    # "single",
+    "single",
     "multi",
 ]
 
 SCALE_TYPES = [
     "minmax", 
-    # "standard",
+    "standard",
 ]
 
 # which model families use the full dataset vs. the reduced one
@@ -1211,8 +1211,8 @@ def nn_get_loaders_and_scalers(model_name, scale_type, config):
         y_scalers = config["y_scalers_reduced"][scale_type]
         pca_list = config["pca_lists"][scale_type]
 
-    train_dl = torch.utils.data.DataLoader(train_ds, batch_size=config["batch_size"], shuffle=True)
-    val_dl   = torch.utils.data.DataLoader(val_ds,   batch_size=config["batch_size"], shuffle=False)
+    train_dl = torch.utils.data.DataLoader(train_ds, batch_size=config["batch_size"], num_workers=0, shuffle=True)
+    val_dl   = torch.utils.data.DataLoader(val_ds,   batch_size=config["batch_size"], num_workers=0, shuffle=False)
     return train_ds, val_ds, train_dl, val_dl, y_scalers, pca_list
 
 
@@ -1249,11 +1249,6 @@ def nn_calculate_metrics(y_pred, Y_batch, wavelengths, y_scalers, pca_list):
 
 # ==================== SINGLE EXPERIMENT ====================
 def nn_run_experiment(model_name, encoder_version, scale_type, config, device, wavelengths, region_configs=None, seed=42):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
 
     dataset_size = int(re.search(r'\d+', Path(globals.CURRENT_TRAIN_FILE).stem).group())
     exp_id = f"{model_name}_{encoder_version}_{scale_type}_{dataset_size}"
@@ -1267,11 +1262,6 @@ def nn_run_experiment(model_name, encoder_version, scale_type, config, device, w
         model = ModelClass(encoder_type=encoder_version, wavelengths=wavelengths, region_configs=region_configs).to(device)
     else:
         model = ModelClass(encoder_type=encoder_version).to(device)
-
-    with torch.no_grad():
-        test_input = torch.ones(1, globals.N_INPUTS, device=device)  # fixed input, not random
-        test_output = model(test_input) if model_name != "EmulatorSet5" else model(test_input)[0]
-        print("SANITY CHECK — first output sum:", test_output.sum().item())
 
     # --- data ---
     train_ds, val_ds, train_dl, val_dl, y_scalers, pca_list = nn_get_loaders_and_scalers(

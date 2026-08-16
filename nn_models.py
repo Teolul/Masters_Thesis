@@ -64,7 +64,10 @@ class SpectralDecoder1(nn.Module):
         x = self.upsample_pipeline(x)  # (N, 8, 4096)
 
         # from 4096, use a tiny interpolation just to cover the last 109 points
-        x = F.interpolate(x, size=4205, mode="linear", align_corners=False)
+        x = F.interpolate(x, size=4205, mode="nearest-exact")
+        # x_2d = x.unsqueeze(2)
+        # x_upsampled = F.interpolate(x_2d, size=(1, 4205), mode="bilinear", align_corners=False)
+        # x = x_upsampled.squeeze(2)
 
         x = self.final_conv(x).squeeze(1)
         return x
@@ -324,7 +327,10 @@ class ResidualConv1D(nn.Module):
         main = self.conv(x)
         skip = self.skip_proj(x)
         if skip.shape[-1] != main.shape[-1]:
-            skip = F.interpolate(skip, size=main.shape[-1], mode="linear", align_corners=False)
+            skip = F.interpolate(skip, size=main.shape[-1], mode="nearest-exact")
+            # x_2d = skip.unsqueeze(2)
+            # x_upsampled = F.interpolate(x_2d, size=(1, main.shape[-1]), mode="bilinear", align_corners=False)
+            # skip = x_upsampled.squeeze(2)
         return self.act(self.norm(main + skip))
  
  
@@ -483,7 +489,10 @@ class RegionBranchingBlock(nn.Module):
             seg_up = self.act(norm(up(seg)))
             target_len = o1 - o0
             if seg_up.shape[-1] != target_len:
-                seg_up = F.interpolate(seg_up, size=target_len, mode="linear", align_corners=False)
+                seg_up = F.interpolate(seg_up, size=target_len, mode="nearest-exact")
+                # x_2d = seg_up.unsqueeze(2)
+                # x_upsampled = F.interpolate(x_2d, size=(1, target_len), mode="bilinear", align_corners=False)
+                # seg_up = x_upsampled.squeeze(2)
             mid_segs.append(seg_up)
             bounds.append((o0, o1))
         mid = torch.cat(mid_segs, dim=-1)
