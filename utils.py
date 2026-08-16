@@ -1249,6 +1249,16 @@ def nn_calculate_metrics(y_pred, Y_batch, wavelengths, y_scalers, pca_list):
 
 # ==================== SINGLE EXPERIMENT ====================
 def nn_run_experiment(model_name, encoder_version, scale_type, config, device, wavelengths, region_configs=None, seed=42):
+    seed = 42
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    if seed == 42:
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
+        torch.use_deterministic_algorithms(True)
 
     dataset_size = int(re.search(r'\d+', Path(globals.CURRENT_TRAIN_FILE).stem).group())
     exp_id = f"{model_name}_{encoder_version}_{scale_type}_{dataset_size}"
