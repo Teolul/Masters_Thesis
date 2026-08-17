@@ -1099,7 +1099,7 @@ SCALE_TYPES = [
 FULL_DS_MODELS    = {"EmulatorSet1", "EmulatorSet5"}
 REDUCED_DS_MODELS = {"EmulatorSet2", "EmulatorSet3", "EmulatorSet4"}
 
-BATCH_SIZE = 4 #4, 16, 64
+BATCH_SIZE = 64 #4, 16, 64
 N_EPOCHS = 100
 PATIENCE = 25
 
