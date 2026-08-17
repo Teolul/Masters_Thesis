@@ -1078,10 +1078,10 @@ def inverse_std_transform(std_red_scaled, scaler, pca):
 
 # ==================== EXPERIMENT GRID ====================
 ARCHITECTURES = {
-    # "EmulatorSet1": nn_models.EmulatorSet1,
-    # "EmulatorSet2": nn_models.EmulatorSet2,
-    # "EmulatorSet3": nn_models.EmulatorSet3,
-    # "EmulatorSet4": nn_models.EmulatorSet4,
+    "EmulatorSet1": nn_models.EmulatorSet1,
+    "EmulatorSet2": nn_models.EmulatorSet2,
+    "EmulatorSet3": nn_models.EmulatorSet3,
+    "EmulatorSet4": nn_models.EmulatorSet4,
     "EmulatorSet5": nn_models.EmulatorSet5
 }
 
@@ -1099,7 +1099,7 @@ SCALE_TYPES = [
 FULL_DS_MODELS    = {"EmulatorSet1", "EmulatorSet5"}
 REDUCED_DS_MODELS = {"EmulatorSet2", "EmulatorSet3", "EmulatorSet4"}
 
-BATCH_SIZE = 64 #4, 16, 64
+BATCH_SIZE = 4 #4, 16, 64
 N_EPOCHS = 100
 PATIENCE = 25
 
