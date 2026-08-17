@@ -1078,11 +1078,11 @@ def inverse_std_transform(std_red_scaled, scaler, pca):
 
 # ==================== EXPERIMENT GRID ====================
 ARCHITECTURES = {
-    "EmulatorSet1": nn_models.EmulatorSet1,
-    "EmulatorSet2": nn_models.EmulatorSet2,
-    "EmulatorSet3": nn_models.EmulatorSet3,
-    "EmulatorSet4": nn_models.EmulatorSet4,
-    # "EmulatorSet5": nn_models.EmulatorSet5
+    # "EmulatorSet1": nn_models.EmulatorSet1,
+    # "EmulatorSet2": nn_models.EmulatorSet2,
+    # "EmulatorSet3": nn_models.EmulatorSet3,
+    # "EmulatorSet4": nn_models.EmulatorSet4,
+    "EmulatorSet5": nn_models.EmulatorSet5
 }
 
 ENCODER_VERSIONS = [
@@ -1249,7 +1249,6 @@ def nn_calculate_metrics(y_pred, Y_batch, wavelengths, y_scalers, pca_list):
 
 # ==================== SINGLE EXPERIMENT ====================
 def nn_run_experiment(model_name, encoder_version, scale_type, config, device, wavelengths, region_configs=None, seed=42):
-    seed = 42
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
