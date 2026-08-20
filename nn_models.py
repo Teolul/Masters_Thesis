@@ -650,3 +650,136 @@ class EmulatorSet5(nn.Module):
             model_outputs.append(out[0])
             model_features.append(out[1])
         return torch.stack(model_outputs, dim=1), model_features
+
+
+# 6th architecture: used for feature-selected data.
+class InputHead6(nn.Module):
+    """A minimal per-function input projection replacing Encoder5."""
+    def __init__(self, in_dim, z_dim=28):
+        super().__init__()
+        self.proj = nn.Linear(in_dim, z_dim)
+        self.act = nn.SiLU()
+
+    def forward(self, x):
+        return self.act(self.proj(x))
+
+
+class SpectralDecoder6(nn.Module):
+    """Set6 decoder: same spectral/output pipeline as Set5, with a wider stem."""
+    def __init__(self, z_dim=28, channels=32, initial_length=32, spectrum_len=4205, n_global_modes=4, region_config=None, wavelengths=None):
+        super().__init__()
+        self.fc = nn.Linear(z_dim, channels * initial_length)
+        self.initial_length = initial_length
+        self.channels = channels
+        if wavelengths is None:
+            wavelengths = torch.linspace(400.0, 2500.0, spectrum_len)
+
+        self.initial_conv = ResidualConv1D(channels, 56, kernel_size=5, stride=1, padding=2, num_groups=4, transpose=False)
+        self.up1 = ResidualConv1D(56, 40, kernel_size=5, stride=2, padding=1, num_groups=4, transpose=True)
+        self.up2 = ResidualConv1D(40, 28, kernel_size=5, stride=2, padding=1, num_groups=4, transpose=True)
+        self.up3 = ResidualConv1D(28, 16, kernel_size=5, stride=2, padding=1, num_groups=4, transpose=True)
+        self.up4 = ResidualConv1D(16, 12, kernel_size=5, stride=2, padding=2, num_groups=4, transpose=True)
+        self.up5 = ResidualConv1D(12, 8, kernel_size=5, stride=2, padding=1, num_groups=4, transpose=True)
+        self.up6 = ResidualConv1D(8, 8, kernel_size=5, stride=2, padding=1, num_groups=4, transpose=True)
+
+        # keep the same region-specific final stage and wavelength handling as Set5
+        self.final_stage = RegionBranchingBlock(
+            in_ch=8,
+            mid_ch=4,
+            in_len=2103,
+            wavelengths=wavelengths,
+            regions=region_config or [(wavelengths[0].item(), wavelengths[-1].item(), 5)],
+            num_groups=4,
+        )
+
+        self.global_residual = GlobalSpectralResidual(z_dim, spectrum_len, n_modes=n_global_modes)
+
+    def decode_stage1(self, z):
+        feats = {}
+        x = self.fc(z).view(z.size(0), self.channels, self.initial_length)
+        feats["32"] = x
+        x = self.initial_conv(x)
+        feats["32_conv"] = x
+        feats["global_correction"] = self.global_residual(z)
+        return x, feats
+
+    def decode_stage2(self, x, feats):
+        x = self.up1(x); feats["65"] = x
+        x = self.up2(x); feats["131"] = x
+        x = self.up3(x); feats["263"] = x
+        x = self.up4(x); feats["525"] = x
+        x = self.up5(x); feats["1051"] = x
+        x = self.up6(x); feats["2103"] = x
+
+        mid, out = self.final_stage(x)
+        feats["4205"] = mid
+        feats["4205_conv"] = out
+
+        local_pred = out.squeeze(1)
+        combined = local_pred + feats["global_correction"]
+        feats["4205_final"] = combined
+        return combined, feats
+
+    def forward(self, z, return_features=True):
+        x, feats = self.decode_stage1(z)
+        out, feats = self.decode_stage2(x, feats)
+        if return_features:
+            return out, feats
+        return out
+
+DEFAULT_INPUT_DIMS = [15, 9, 11, 8, 7, 9]
+
+class EmulatorSet6(nn.Module):
+    """Six-function emulator with heterogeneous feature counts and no encoder."""
+    def __init__(self, input_dims=None, z_dim=28, channels=32, wavelengths=None, region_configs=None):
+        super().__init__()
+        self.input_dims = list(input_dims or DEFAULT_INPUT_DIMS)
+        if len(self.input_dims) != globals.N_FUNCTIONS:
+            raise ValueError(f"expected {globals.N_FUNCTIONS} input dimensions, got {len(self.input_dims)}")
+
+        self.z_dim = z_dim
+        self.channels = channels
+        self.region_configs = region_configs or DEFAULT_REGION_CONFIGS
+
+        # one lightweight projection per transfer function handles heterogeneous input dimensionality
+        self.input_heads = nn.ModuleList([InputHead6(in_dim, z_dim=z_dim) for in_dim in self.input_dims])
+
+        self.decoders = nn.ModuleList([
+            SpectralDecoder6(z_dim=z_dim, channels=channels, region_config=self.region_configs[i], wavelengths=wavelengths)
+            for i in range(globals.N_FUNCTIONS)
+        ])
+
+        # same cross-function mixing point and output contract as Set5
+        self.function_mixer = FunctionMixer(globals.N_FUNCTIONS)
+
+    def forward(self, x):
+        if isinstance(x, dict):
+            x = [x[i] for i in range(globals.N_FUNCTIONS)]
+        if not isinstance(x, (list, tuple)) or len(x) != globals.N_FUNCTIONS:
+            raise TypeError("EmulatorSet6 expects a list/tuple of 6 tensors, one per transfer function.")
+
+        for i, (xi, expected_dim) in enumerate(zip(x, self.input_dims)):
+            if xi.ndim != 2:
+                raise ValueError(f"input {i} must have shape (batch, features), got {tuple(xi.shape)}")
+            if xi.shape[1] != expected_dim:
+                raise ValueError(f"input {i} expects {expected_dim} features, got {xi.shape[1]}")
+        batch_sizes = [xi.shape[0] for xi in x]
+        if len(set(batch_sizes)) != 1:
+            raise ValueError(f"all six inputs must have the same batch size, got {batch_sizes}")
+
+        zs = [head(xi) for head, xi in zip(self.input_heads, x)]
+
+        stage1 = [decoder.decode_stage1(z) for decoder, z in zip(self.decoders, zs)]
+        xs = [s[0] for s in stage1]
+        feats_list = [s[1] for s in stage1]
+
+        xs = self.function_mixer(xs)
+
+        outputs = [
+            decoder.decode_stage2(x_i, feats_i)
+            for decoder, x_i, feats_i in zip(self.decoders, xs, feats_list)
+        ]
+
+        model_outputs = [out[0] for out in outputs]
+        model_features = [out[1] for out in outputs]
+        return torch.stack(model_outputs, dim=1), model_features

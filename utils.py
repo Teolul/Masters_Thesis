@@ -195,6 +195,34 @@ def scale_input_data(x_tr, x_val, scale_type="standard"):
     return scaler, x_tr_scaled, x_val_scaled
 
 
+def scale_input_data_feature_selection(x_tr, x_val, scale_type="standard"):
+    """
+    Scale feature-selected inputs independently for each transfer function.
+    - x_tr/x_val: lists containing one (n_samples, n_features) array per function
+    - scale_type: "standard" or "minmax"
+    - returns: list of scalers, scaled training inputs, scaled validation inputs
+    """
+    print(f"---------- Scaling feature-selected input data using {scale_type} scaling... ----------")
+
+    scalers = []
+    x_tr_scaled = []
+    x_val_scaled = []
+
+    for i, (x_tr_func, x_val_func) in enumerate(zip(x_tr, x_val)):
+        scaler = StandardScaler() if scale_type == "standard" else MinMaxScaler()
+        scaler.fit(x_tr_func)
+        x_tr_func_scaled = scaler.transform(x_tr_func)
+        x_val_func_scaled = scaler.transform(x_val_func)
+        scalers.append(scaler)
+        x_tr_scaled.append(x_tr_func_scaled)
+        x_val_scaled.append(x_val_func_scaled)
+        print(f"Function {i}: {x_tr_func.shape[1]} features")
+
+    print("---------- Feature-selected input data scaling completed. ----------\n")
+
+    return scalers, x_tr_scaled, x_val_scaled
+
+
 def scale_output_data(y_tr, y_val, scale_type="standard"):
     """
     Scale the output data using the provided scalers
@@ -1078,25 +1106,26 @@ def inverse_std_transform(std_red_scaled, scaler, pca):
 
 # ==================== EXPERIMENT GRID ====================
 ARCHITECTURES = {
-    "EmulatorSet1": nn_models.EmulatorSet1,
-    "EmulatorSet2": nn_models.EmulatorSet2,
-    "EmulatorSet3": nn_models.EmulatorSet3,
-    "EmulatorSet4": nn_models.EmulatorSet4,
-    "EmulatorSet5": nn_models.EmulatorSet5
+    # "EmulatorSet1": nn_models.EmulatorSet1,
+    # "EmulatorSet2": nn_models.EmulatorSet2,
+    # "EmulatorSet3": nn_models.EmulatorSet3,
+    # "EmulatorSet4": nn_models.EmulatorSet4,
+    # "EmulatorSet5": nn_models.EmulatorSet5,
+    "EmulatorSet6": nn_models.EmulatorSet6
 }
 
 ENCODER_VERSIONS = [
-    "single",
+    # "single",
     "multi",
 ]
 
 SCALE_TYPES = [
     "minmax", 
-    "standard",
+    # "standard",
 ]
 
 # which model families use the full dataset vs. the reduced one
-FULL_DS_MODELS    = {"EmulatorSet1", "EmulatorSet5"}
+FULL_DS_MODELS    = {"EmulatorSet1", "EmulatorSet5", "EmulatorSet6"}
 REDUCED_DS_MODELS = {"EmulatorSet2", "EmulatorSet3", "EmulatorSet4"}
 
 BATCH_SIZE = 4 #4, 16, 64
@@ -1105,9 +1134,14 @@ PATIENCE = 25
 
 
 def nn_create_datasets(X_tr, X_val, Y_tr, Y_val, X_test, Y_test, verbose=True):
-    train_ds = nn_dataset.MyDataset(X_tr, Y_tr)
-    val_ds = nn_dataset.MyDataset(X_val, Y_val)
-    test_ds = nn_dataset.MyDataset(X_test, Y_test)
+    if X_tr[0].shape[1] == globals.N_INPUTS:
+        train_ds = nn_dataset.MyDataset(X_tr, Y_tr)
+        val_ds = nn_dataset.MyDataset(X_val, Y_val)
+        test_ds = nn_dataset.MyDataset(X_test, Y_test)
+    else:
+        train_ds = nn_dataset.MyDataset2(X_tr, Y_tr)
+        val_ds = nn_dataset.MyDataset2(X_val, Y_val)
+        test_ds = nn_dataset.MyDataset2(X_test, Y_test)
 
     if verbose:
         print("Train dataset length:", len(train_ds))
@@ -1147,10 +1181,16 @@ def nn_prepare_all_experiments(X_tr, X_val, X_test, Y_tr, Y_val, Y_test, n_pca_c
         print(f"\n── Preparing [{scale_type}] ──────────────────────────────")
 
         # --- inputs ---
-        x_scaler, X_tr_scaled, X_val_scaled = scale_input_data(
-            X_tr, X_val, scale_type=scale_type
-        )
-        X_test_scaled = x_scaler.transform(X_test)
+        if X_tr[0].shape[1] == globals.N_INPUTS:
+            x_scaler, X_tr_scaled, X_val_scaled = scale_input_data(
+                X_tr, X_val, scale_type=scale_type
+            )
+            X_test_scaled = x_scaler.transform(X_test)
+        else:
+            x_scaler, X_tr_scaled, X_val_scaled = scale_input_data_feature_selection(
+                X_tr, X_val, scale_type=scale_type
+            )
+            X_test_scaled = [x_scaler[i].transform(X_test[i]) for i in range(globals.N_FUNCTIONS)]
 
         # --- full outputs ---
         y_scalers, Y_tr_scaled, Y_val_scaled = scale_output_data(
@@ -1170,11 +1210,11 @@ def nn_prepare_all_experiments(X_tr, X_val, X_test, Y_tr, Y_val, Y_test, n_pca_c
 
         # --- datasets ---
         train_ds_scaled, val_ds_scaled, test_ds_scaled = nn_create_datasets(
-            X_tr_scaled, X_val_scaled, Y_tr_scaled, Y_val_scaled, X_test_scaled, Y_test_scaled
+            X_tr_scaled, X_val_scaled, Y_tr_scaled, Y_val_scaled, X_test_scaled, Y_test_scaled, verbose=False
         )
         train_ds_reduced_scaled, val_ds_reduced_scaled, test_ds_reduced_scaled = nn_create_datasets(
             X_tr_scaled, X_val_scaled, Y_tr_reduced_scaled, Y_val_reduced_scaled,
-            X_test_scaled, Y_test_reduced_scaled
+            X_test_scaled, Y_test_reduced_scaled, verbose=False
         )
 
         # --- store everything under the scale_type key ---
@@ -1269,6 +1309,9 @@ def nn_run_experiment(model_name, encoder_version, scale_type, config, device, w
     ModelClass = ARCHITECTURES[model_name]
     if model_name == "EmulatorSet5":
         model = ModelClass(encoder_type=encoder_version, wavelengths=wavelengths, region_configs=region_configs).to(device)
+    elif model_name == "EmulatorSet6":
+        input_dims = [x.shape[0] for x in config["train_ds_scaled"][scale_type].__getitem__(0)[0]]
+        model = ModelClass(input_dims=input_dims, wavelengths=wavelengths, region_configs=region_configs).to(device)
     else:
         model = ModelClass(encoder_type=encoder_version).to(device)
 
@@ -1303,9 +1346,13 @@ def nn_run_experiment(model_name, encoder_version, scale_type, config, device, w
         all_targets = []
 
         for X_batch, Y_batch in tqdm(train_dl, desc=f"[{exp_id}] E{epoch+1} Train", leave=False):
-            X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
+            if X_batch[0].shape[1] == globals.N_INPUTS:
+                X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
+            else:
+                X_batch = [x.to(device) for x in X_batch]
+                Y_batch = Y_batch.to(device)
             optimizer.zero_grad()
-            if model_name == "EmulatorSet5":
+            if model_name == "EmulatorSet5" or model_name == "EmulatorSet6":
                 y_pred, _ = model(X_batch)
             else:
                 y_pred = model(X_batch)
@@ -1313,7 +1360,10 @@ def nn_run_experiment(model_name, encoder_version, scale_type, config, device, w
             loss.backward()
             optimizer.step()
 
-            epoch_train_loss += loss.item() * X_batch.size(0)
+            if model_name != "EmulatorSet6":
+                epoch_train_loss += loss.item() * X_batch.size(0)
+            else:
+                epoch_train_loss += loss.item() * X_batch[0].size(0)
             all_preds.append(y_pred.detach().cpu())
             all_targets.append(Y_batch.cpu())
 
@@ -1330,14 +1380,21 @@ def nn_run_experiment(model_name, encoder_version, scale_type, config, device, w
 
         with torch.no_grad():
             for X_batch, Y_batch in tqdm(val_dl, desc=f"[{exp_id}] E{epoch+1} Val", leave=False):
-                X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
-                if model_name == "EmulatorSet5":
+                if X_batch[0].shape[1] == globals.N_INPUTS:
+                    X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
+                else:
+                    X_batch = [x.to(device) for x in X_batch]
+                    Y_batch = Y_batch.to(device)
+                if model_name == "EmulatorSet5" or model_name == "EmulatorSet6":
                     y_pred, _ = model(X_batch)
                 else:
                     y_pred = model(X_batch)
                 loss   = criterion(y_pred, Y_batch)
 
-                epoch_val_loss += loss.item() * X_batch.size(0)
+                if model_name != "EmulatorSet6":
+                    epoch_val_loss += loss.item() * X_batch.size(0)
+                else:
+                    epoch_val_loss += loss.item() * X_batch[0].size(0)
                 all_preds.append(y_pred.cpu())
                 all_targets.append(Y_batch.cpu())
 
