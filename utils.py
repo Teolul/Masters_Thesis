@@ -565,7 +565,7 @@ def show_fit_val_summary(results_df, title="Results Summary", save_path="nn_save
     offsets = np.linspace(-(n_mdl - 1) / 2, (n_mdl - 1) / 2, n_mdl) * width
 
 
-    def _grouped_bars(ax, pivot, ylabel, title):
+    def _grouped_bars(ax, pivot, ylabel, title, factor=100):
         for i, mdl in enumerate(models):
             vals = pivot[mdl].values if mdl in pivot.columns else np.zeros(len(dataset_sizes))
             bars = ax.bar(x + offsets[i], vals, width, label=mdl,
@@ -573,7 +573,7 @@ def show_fit_val_summary(results_df, title="Results Summary", save_path="nn_save
             for bar in bars:
                 h = bar.get_height()
                 ax.text(bar.get_x() + bar.get_width() / 2, h * 1.015,
-                        f"{h:.4f}", ha="center", va="bottom", fontsize=7.5)
+                        f"{h*factor:.2f}", ha="center", va="bottom", fontsize=8)
         ax.set_xticks(x)
         ax.set_xticklabels([str(s) for s in dataset_sizes])
         ax.set_xlabel("Dataset Size")
@@ -585,10 +585,10 @@ def show_fit_val_summary(results_df, title="Results Summary", save_path="nn_save
 
 
     # panel 1 — pal MRE
-    _grouped_bars(axes[0], mre_pivot, "Avg Val MRE", "Validation MRE by Model & Dataset Size")
+    _grouped_bars(axes[0], mre_pivot, "Avg Val MRE (%)", "Validation MRE by Model & Dataset Size")
 
     # panel 2 — pal MAE
-    _grouped_bars(axes[1], mae_pivot, "Avg Val MAE", "Validation MAE by Model & Dataset Size")
+    _grouped_bars(axes[1], mae_pivot, "Avg Val MAE", "Validation MAE by Model & Dataset Size", factor=1)
 
     # panel 3 — fit time (single series, no model split)
     fit_vals = [fit_pivot.loc[s, "avg_fit_time"] for s in dataset_sizes]
@@ -710,11 +710,11 @@ def show_test_summary(results_df, title="Results Summary", save_path="nn_saves/n
 
     x      = np.arange(len(dataset_sizes))
     n_mdl  = len(models)
-    width  = 0.10
+    width  = 0.15
     offsets = np.linspace(-(n_mdl - 1) / 2, (n_mdl - 1) / 2, n_mdl) * width
 
 
-    def _grouped_bars(ax, pivot, ylabel, title):
+    def _grouped_bars(ax, pivot, ylabel, title, factor=100):
         for i, mdl in enumerate(models):
             vals = pivot[mdl].values if mdl in pivot.columns else np.zeros(len(dataset_sizes))
             bars = ax.bar(x + offsets[i], vals, width, label=mdl,
@@ -722,7 +722,7 @@ def show_test_summary(results_df, title="Results Summary", save_path="nn_saves/n
             for bar in bars:
                 h = bar.get_height()
                 ax.text(bar.get_x() + bar.get_width() / 2, h * 1.015,
-                        f"{h:.4f}", ha="center", va="bottom", fontsize=6, rotation=25)
+                        f"{h*factor:.2f}", ha="center", va="bottom", fontsize=8)
         ax.set_xticks(x)
         ax.set_xticklabels([str(s) for s in dataset_sizes])
         ax.set_xlabel("Dataset Size")
@@ -734,10 +734,10 @@ def show_test_summary(results_df, title="Results Summary", save_path="nn_saves/n
 
 
     # panel 1 — pal MRE
-    _grouped_bars(axes[0], mre_pivot, "Avg Test MRE", "Test MRE by Model & Dataset Size")
+    _grouped_bars(axes[0], mre_pivot, "Avg Test MRE (%)", "Test MRE by Model & Dataset Size")
 
     # panel 2 — pal MAE
-    _grouped_bars(axes[1], mae_pivot, "Avg Test MAE", "Test MAE by Model & Dataset Size")
+    _grouped_bars(axes[1], mae_pivot, "Avg Test MAE", "Test MAE by Model & Dataset Size", factor=1)
 
     # panel 3 — inference time (single series, no model split)
     inf_vals = [inf_pivot.loc[s, "avg_inference_time"] for s in dataset_sizes]
@@ -1134,7 +1134,7 @@ PATIENCE = 25
 
 
 def nn_create_datasets(X_tr, X_val, Y_tr, Y_val, X_test, Y_test, verbose=True):
-    if X_tr[0].shape[1] == globals.N_INPUTS:
+    if not isinstance(X_tr, list):
         train_ds = nn_dataset.MyDataset(X_tr, Y_tr)
         val_ds = nn_dataset.MyDataset(X_val, Y_val)
         test_ds = nn_dataset.MyDataset(X_test, Y_test)
@@ -1181,7 +1181,8 @@ def nn_prepare_all_experiments(X_tr, X_val, X_test, Y_tr, Y_val, Y_test, n_pca_c
         print(f"\n── Preparing [{scale_type}] ──────────────────────────────")
 
         # --- inputs ---
-        if X_tr[0].shape[1] == globals.N_INPUTS:
+
+        if not isinstance(X_tr, list):
             x_scaler, X_tr_scaled, X_val_scaled = scale_input_data(
                 X_tr, X_val, scale_type=scale_type
             )
