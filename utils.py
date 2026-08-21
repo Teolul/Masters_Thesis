@@ -1106,21 +1106,21 @@ def inverse_std_transform(std_red_scaled, scaler, pca):
 
 # ==================== EXPERIMENT GRID ====================
 ARCHITECTURES = {
-    "EmulatorSet1": nn_models.EmulatorSet1,
-    "EmulatorSet2": nn_models.EmulatorSet2,
-    "EmulatorSet3": nn_models.EmulatorSet3,
-    "EmulatorSet4": nn_models.EmulatorSet4,
+    # "EmulatorSet1": nn_models.EmulatorSet1,
+    # "EmulatorSet2": nn_models.EmulatorSet2,
+    # "EmulatorSet3": nn_models.EmulatorSet3,
+    # "EmulatorSet4": nn_models.EmulatorSet4,
     "EmulatorSet5": nn_models.EmulatorSet5,
-    "EmulatorSet6": nn_models.EmulatorSet6
+    # "EmulatorSet6": nn_models.EmulatorSet6
 }
 
 ENCODER_VERSIONS = [
-    "single",
+    # "single",
     "multi",
 ]
 
 SCALE_TYPES = [
-    "minmax", 
+    # "minmax", 
     "standard",
 ]
 
@@ -1128,7 +1128,7 @@ SCALE_TYPES = [
 FULL_DS_MODELS    = {"EmulatorSet1", "EmulatorSet5", "EmulatorSet6"}
 REDUCED_DS_MODELS = {"EmulatorSet2", "EmulatorSet3", "EmulatorSet4"}
 
-BATCH_SIZE = 4 #4, 16, 64
+BATCH_SIZE = 64 #4, 16, 64
 N_EPOCHS = 100
 PATIENCE = 25
 
@@ -1347,7 +1347,7 @@ def nn_run_experiment(model_name, encoder_version, scale_type, config, device, w
         all_targets = []
 
         for X_batch, Y_batch in tqdm(train_dl, desc=f"[{exp_id}] E{epoch+1} Train", leave=False):
-            if X_batch[0].shape[1] == globals.N_INPUTS:
+            if not isinstance(X_batch, list):
                 X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
             else:
                 X_batch = [x.to(device) for x in X_batch]
@@ -1381,7 +1381,7 @@ def nn_run_experiment(model_name, encoder_version, scale_type, config, device, w
 
         with torch.no_grad():
             for X_batch, Y_batch in tqdm(val_dl, desc=f"[{exp_id}] E{epoch+1} Val", leave=False):
-                if X_batch[0].shape[1] == globals.N_INPUTS:
+                if not isinstance(X_batch, list):
                     X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
                 else:
                     X_batch = [x.to(device) for x in X_batch]
