@@ -340,7 +340,7 @@ def mre_amlec(rho_ref: np.ndarray, rho_ret: np.ndarray, wvl: np.ndarray) -> floa
         ((wvl > 1750) & (wvl < 1980)) |
         (wvl > 2420)
     )
-    return np.nanmean(re_mean[mask])
+    return np.nanmean(re_mean.flatten()[mask.flatten()])
 
 
 def build_mask(wavelengths):
@@ -469,7 +469,7 @@ def calculate_coverage(y_true, y_pred, y_std, n_std=2):
 def show_fit_val_summary(results_df, title="Results Summary", save_path="nn_saves/nn_results_analysis.png"):
     if results_df["experiment_id"].str.startswith("DotProduct_", na=False).any():
         plot_results_df = results_df[
-            ~results_df["experiment_id"].str.startswith("DotProduct_", na=False)
+            ~results_df["experiment_id"].str.startswith(("DotProduct_", "Matern_iso"), na=False)
         ]
     else:
         plot_results_df = results_df.copy()
@@ -614,7 +614,7 @@ def show_fit_val_summary(results_df, title="Results Summary", save_path="nn_save
 def show_test_summary(results_df, title="Results Summary", save_path="nn_saves/nn_results_analysis.png"):
     if results_df["experiment_id"].str.startswith("DotProduct_", na=False).any():
         plot_results_df = results_df[
-            ~results_df["experiment_id"].str.startswith("DotProduct_", na=False)
+            ~results_df["experiment_id"].str.startswith(("DotProduct_", "Matern_iso"), na=False)
         ]
     else:
         plot_results_df = results_df.copy()
@@ -788,7 +788,7 @@ def show_barplot_results(results_df, title="Bar Plot of Results", save_path="nn_
     # sort by best_val_mre ascending
     if results_df["experiment_id"].str.startswith("DotProduct_", na=False).any():
         plot_results_df = results_df[
-            ~results_df["experiment_id"].str.startswith("DotProduct_", na=False)
+            ~results_df["experiment_id"].str.startswith(("DotProduct_", "Matern_iso"), na=False)
         ]
     else:
         plot_results_df = results_df.copy()
@@ -1063,12 +1063,16 @@ def show_residuals(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_path="nn_s
     plt.show()
 
 
-def show_multiple_experiments_errors(errors_per_wvl, wavelengths, ylabel="Log10(MRE)", title="Log10(MRE) per Wavelength for Selected Models"):
+def show_multiple_experiments_errors(errors_per_wvl, wavelengths, xlims=[], ylims=[], ylabel="Error", title="Errors"):
     plt.figure(figsize=(10, 6))
-    for exp_id, mre_per_wvl in errors_per_wvl.items():
-        plt.plot(wavelengths, mre_per_wvl, label=exp_id)
+    for exp_id, err_per_wvl in errors_per_wvl.items():
+        plt.plot(wavelengths, err_per_wvl, label=exp_id)
     plt.xlabel("Wavelength (nm)")
     plt.ylabel(ylabel)
+    if len(xlims) > 0:
+        plt.xlim(xlims[0], xlims[1])
+    if len(ylims) > 0:
+        plt.ylim(ylims[0], ylims[1])
     plt.title(title)
     plt.grid()
     plt.legend()
@@ -1106,21 +1110,21 @@ def inverse_std_transform(std_red_scaled, scaler, pca):
 
 # ==================== EXPERIMENT GRID ====================
 ARCHITECTURES = {
-    # "EmulatorSet1": nn_models.EmulatorSet1,
-    # "EmulatorSet2": nn_models.EmulatorSet2,
-    # "EmulatorSet3": nn_models.EmulatorSet3,
-    # "EmulatorSet4": nn_models.EmulatorSet4,
+    "EmulatorSet1": nn_models.EmulatorSet1,
+    "EmulatorSet2": nn_models.EmulatorSet2,
+    "EmulatorSet3": nn_models.EmulatorSet3,
+    "EmulatorSet4": nn_models.EmulatorSet4,
     "EmulatorSet5": nn_models.EmulatorSet5,
-    # "EmulatorSet6": nn_models.EmulatorSet6
+    "EmulatorSet6": nn_models.EmulatorSet6
 }
 
 ENCODER_VERSIONS = [
-    # "single",
+    "single",
     "multi",
 ]
 
 SCALE_TYPES = [
-    # "minmax", 
+    "minmax", 
     "standard",
 ]
 
