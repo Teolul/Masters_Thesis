@@ -27,4 +27,12 @@ RBF+RationalQuadratic_standard_2000,"1**2*RBF(length_scale=[1,1,1,1,1,1,1,1,1])+
 DotProduct+RBF_standard_2000,"1**2*DotProduct(sigma_0=1)+RBF(length_scale=[1,1,1,1,1,1,1,1,1])+WhiteKernel(noise_level=0.01)",DotProduct+RBF,standard,2000,389.17395853996277,0.0018005517,0.107542254
 DotProduct_standard_2000,1**2*DotProduct(sigma_0=1)+WhiteKernel(noise_level=0.01),DotProduct,standard,2000,42.64874076843262,0.04587834,5.469382
 Matern+RationalQuadratic_standard_2000,"1**2*Matern(length_scale=[1,1,1,1,1,1,1,1,1],nu=2.5)+RationalQuadratic(alpha=1,length_scale=1)+WhiteKernel(noise_level=0.01)",Matern+RationalQuadratic,standard,2000,795.617826461792,0.0017008712,0.08920979
-Matern_iso_minmax_500,"1**2*Matern(length_scale=1,nu=2.5)+WhiteKernel(noise_level=0.01)",Matern,minmax,500,3.5205750465393066,0.0046291556,0.61988604
+Matern_iso_minmax_500_2,"1**2*Matern(length_scale=1,nu=2.5)+WhiteKernel(noise_level=0.01)",Matern_iso,minmax,500,1.766615867614746,0.030052507,1.6780571
+Matern_iso_minmax_500_3,"1**2*Matern(length_scale=1,nu=2.5)+WhiteKernel(noise_level=0.01)",Matern_iso,minmax,500,2.331092119216919,0.012869028,0.8729933
+Matern_iso_minmax_500_4,"1**2*Matern(length_scale=1,nu=2.5)+WhiteKernel(noise_level=0.01)",Matern_iso,minmax,500,2.255650520324707,0.007989405,0.634259
+Matern_iso_minmax_500_5,"1**2*Matern(length_scale=1,nu=2.5)+WhiteKernel(noise_level=0.01)",Matern_iso,minmax,500,3.028493642807007,0.006952687,0.5053527
+Matern_iso_minmax_500_6,"1**2*Matern(length_scale=1,nu=2.5)+WhiteKernel(noise_level=0.01)",Matern_iso,minmax,500,2.306833267211914,0.004489472,0.4856205
+Matern_iso_minmax_500_7,"1**2*Matern(length_scale=1,nu=2.5)+WhiteKernel(noise_level=0.01)",Matern_iso,minmax,500,3.0503721237182617,0.00422733,0.47881812
+Matern_iso_minmax_500_8,"1**2*Matern(length_scale=1,nu=2.5)+WhiteKernel(noise_level=0.01)",Matern_iso,minmax,500,2.7173964977264404,0.004517129,0.5820993
+Matern_iso_minmax_500_9,"1**2*Matern(length_scale=1,nu=2.5)+WhiteKernel(noise_level=0.01)",Matern_iso,minmax,500,2.846618890762329,0.004420007,0.5589992
+Matern_iso_minmax_500_10,"1**2*Matern(length_scale=1,nu=2.5)+WhiteKernel(noise_level=0.01)",Matern_iso,minmax,500,3.374392509460449,0.004629155,0.6198869
