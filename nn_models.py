@@ -555,37 +555,39 @@ class SpectralDecoder5(nn.Module):
         they continue independently."""
         feats = {}
         x = self.fc(z).view(z.size(0), self.channels, self.initial_length)
-        feats["32"] = x
+        # feats["32"] = x
         x = self.initial_conv(x)
-        feats["32_conv"] = x
-        feats["global_correction"] = self.global_residual(z)
-        return x, feats
+        #feats["32_conv"] = x
+        # feats["global_correction"] = self.global_residual(z)
+        global_correction = self.global_residual(z)
+        return x, global_correction #feats
  
-    def decode_stage2(self, x, feats):
+    def decode_stage2(self, x, global_correction):
         """up1 ... final_conv, continuing from decode_stage1's output
         (or from a cross-function-mixed version of it)."""
-        x = self.up1(x); feats["65"] = x
-        x = self.up2(x); feats["131"] = x
-        x = self.up3(x); feats["263"] = x
-        x = self.up4(x); feats["525"] = x
-        x = self.up5(x); feats["1051"] = x
-        x = self.up6(x); feats["2103"] = x
+        x = self.up1(x); # feats["65"] = x
+        x = self.up2(x); # feats["131"] = x
+        x = self.up3(x); # feats["263"] = x
+        x = self.up4(x); # feats["525"] = x
+        x = self.up5(x); # feats["1051"] = x
+        x = self.up6(x); # feats["2103"] = x
  
         mid, out = self.final_stage(x)
-        feats["4205"] = mid          # 8-channel combined feature map (same key as before)
-        feats["4205_conv"] = out     # local (conv-only) prediction, pre-global-correction
+        # feats["4205"] = mid          # 8-channel combined feature map (same key as before)
+        # feats["4205_conv"] = out     # local (conv-only) prediction, pre-global-correction
  
         local_pred = out.squeeze(1)
-        combined = local_pred + feats["global_correction"]
-        feats["4205_final"] = combined # what's actually returned / trained against
+        combined = local_pred + global_correction
+        # feats["4205_final"] = combined # what's actually returned / trained against
  
-        return combined, feats
+        return combined, {}
  
     def forward(self, z, return_features=True):
         """Kept intact for standalone use (e.g. testing/plotting a single
         decoder in isolation, without cross-function mixing)."""
-        x, feats = self.decode_stage1(z)
-        out, feats = self.decode_stage2(x, feats)
+        # x, feats = self.decode_stage1(z)
+        x, global_correction = self.decode_stage1(z)
+        out, feats = self.decode_stage2(x, global_correction)
         if return_features:
             return out, feats
         return out

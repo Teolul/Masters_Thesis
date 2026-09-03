@@ -248,38 +248,6 @@ def scale_output_data(y_tr, y_val, scale_type="standard"):
 
 #region SCORING METRICS
 
-def toa_radiance(rho_ref: np.ndarray, Y_true: np.ndarray, sza: np.ndarray, n_wvl: int) -> np.ndarray:
-    """
-    Computes Top-Of-Atmosphere (TOA) radiance from surface reflectance.
-    Inverse operation of `retrieve_reflectance`.
-
-    Args:
-        rho_ref (np.ndarray): Reference surface reflectance, shape [n_wvl] or broadcastable.
-        Y_true (np.ndarray): Transfer-function blocks, shape [6*n_wvl, n_samples].
-        sza (np.ndarray): Solar zenith angle, shape [1, 1].
-        n_wvl (int): Number of wavelengths.
-
-    Returns:
-        np.ndarray: TOA radiance ($L_{toa}$), shape [n_wvl, n_samples].
-    """
-    L0 = Y_true[:, 0:n_wvl]
-    E_dir = Y_true[:, n_wvl:2*n_wvl]
-    E_dif = Y_true[:, 2*n_wvl:3*n_wvl]
-    Sa = Y_true[:, 3*n_wvl:4*n_wvl]
-    T_dir = Y_true[:, 4*n_wvl:5*n_wvl]
-    T_dif = Y_true[:, 5*n_wvl:6*n_wvl]
-
-    E_total = E_dir * np.cos(np.radians(sza)) + E_dif
-    T_total = T_dir + T_dif
-
-    numerator = E_total * T_total * rho_ref
-    denominator = 1.0 - Sa * rho_ref
-    
-    # Latex: L_{toa} = L_0 + \frac{1}{\pi} \frac{E_{total} T_{total} \rho}{1 - S_a \rho}
-    Ltoa = L0 + (1.0 / np.pi) * (numerator / denominator)
-    return Ltoa
-
-
 def retrieve_reflectance(Ltoa: np.ndarray, Y_pred: np.ndarray, sza: np.ndarray, n_wvl: int) -> np.ndarray:
     """
     Performs atmospheric correction to retrieve surface reflectance.
@@ -316,7 +284,7 @@ def retrieve_reflectance(Ltoa: np.ndarray, Y_pred: np.ndarray, sza: np.ndarray, 
     return rho_ret
 
 
-def mre_amlec(rho_ref: np.ndarray, rho_ret: np.ndarray, wvl: np.ndarray) -> float:
+def mre_amlec(rho_ref: np.ndarray, rho_ret: np.ndarray, wvl: np.ndarray, axis: int | None = None) -> float | np.ndarray:
     """
     Computes the error metric for Scenario A (Atmospheric Correction).
     Calculates Mean Relative Error (MRE) excluding specific absorption bands.
@@ -325,22 +293,28 @@ def mre_amlec(rho_ref: np.ndarray, rho_ret: np.ndarray, wvl: np.ndarray) -> floa
         rho_ref (np.ndarray): Reference reflectance, shape [n_wvl].
         rho_ret (np.ndarray): Retrieved reflectance, shape [n_samples, n_wvl].
         wvl (np.ndarray): Wavelengths, shape [1, n_wvl].
+        axis: None -> global scalar
+              1    -> per wavelength
 
     Returns:
-        float: Mean relative error in percentage.
+        float or np.ndarray: Mean relative error in percentage.
     """
     re = 100.0 * np.abs(rho_ret - rho_ref) / rho_ref
-    re_mean = np.nanmean(re, axis=0, keepdims=True)
-    
-    # exclude deep absorption bands (water vapor, etc.)
-    mask = ~(
-        ((wvl > 931) & (wvl < 945)) |
-        ((wvl > 1100) & (wvl < 1160)) |
-        ((wvl > 1300) & (wvl < 1500)) |
-        ((wvl > 1750) & (wvl < 1980)) |
-        (wvl > 2420)
-    )
-    return np.nanmean(re_mean.flatten()[mask.flatten()])
+
+    if axis is None:
+        mask = ~(
+            ((wvl > 931) & (wvl < 945)) |
+            ((wvl > 1100) & (wvl < 1160)) |
+            ((wvl > 1300) & (wvl < 1500)) |
+            ((wvl > 1750) & (wvl < 1980)) |
+            (wvl > 2420)
+        )
+        re_mean = np.nanmean(re, axis=0, keepdims=True)
+        return np.nanmean(re_mean.flatten()[mask.flatten()])
+    elif axis == 1:
+        return np.nanmean(re, axis=0)
+    else:
+        raise ValueError("Invalid axis value. Must be None, 0, 1, or 2.")
 
 
 def build_mask(wavelengths):
@@ -819,15 +793,24 @@ def show_test_results_mre(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_pat
     - inputs: true test outputs, predicted test outputs, wavelengths
     - outputs: prints MRE scores and displays plots of MRE per wavelength and per function
     """
-    mre = mre_score(y_test, y_pred, wavelengths)
+    if "amlec" in save_path:
+        mre = mre_amlec(y_test, y_pred, wavelengths)
+    else:
+        mre = mre_score(y_test, y_pred, wavelengths)
     print("Testing MRE:", mre)
 
-    mre_per_func = mre_score(y_test, y_pred, wavelengths, axis=2)
-    for i in range(globals.N_FUNCTIONS):
-        print(f"{globals.function_names_plots[i]} MRE: {mre_per_func[i]:.4f}")
+    if "amlec" not in save_path:
+        mre_per_func = mre_score(y_test, y_pred, wavelengths, axis=2)
+        for i in range(globals.N_FUNCTIONS):
+            print(f"{globals.function_names_plots[i]} MRE: {mre_per_func[i]:.4f}")
+    else:
+        mre_per_func = None
 
     # ---MRE PER WAVELENGTH AND ZOOMED---
-    mre_per_wvl = mre_score(y_test, y_pred, wavelengths, axis=1)
+    if "amlec" in save_path:
+        mre_per_wvl = mre_amlec(y_test, y_pred, wavelengths, axis=1)
+    else:
+        mre_per_wvl = mre_score(y_test, y_pred, wavelengths, axis=1)
     fig, axes = plt.subplots(1, 2, figsize=(20, 5))
     plt.suptitle(exp_id, fontsize=16, y=1.02)
     axes[0].plot(wavelengths, mre_per_wvl)
@@ -888,53 +871,54 @@ def show_test_results_mre(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_pat
     plt.show()
 
     # ---MRE PER FUNCTION PER WAVELENGTH ZOOMED---
-    mre_per_func_wvl = mre_score(y_test, y_pred, wavelengths, axis=0)
-    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
-    plt.suptitle(exp_id, fontsize=16, y=1.02)
-    axes = axes.flatten()
-    for i in range(globals.N_FUNCTIONS):
-        axes[i].plot(wavelengths, mre_per_func_wvl[i])
-        axes[i].set_ylim(0, 1.25)
-        axes[i].set_xlabel("Wavelength (nm)")
-        axes[i].set_ylabel("MRE")
-        axes[i].set_title(f"MRE for {globals.function_names_plots[i]} per wavelength")
-        axes[i].grid()
-    plt.tight_layout()
-    plt.savefig(save_path + f"{exp_id}_mre_functions.png", dpi=300, bbox_inches="tight")
-    plt.show()
-
-    # ---MRE PER FUNCTION PER WAVELENGTH LOG---
-    mre_per_func_wvl_log = np.log10(mre_per_func_wvl + 1e-10)  # add small value to avoid log(0)
-    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
-    plt.suptitle(exp_id, fontsize=16, y=1.02)
-    axes = axes.flatten()
-    for i in range(globals.N_FUNCTIONS):
-        axes[i].plot(wavelengths, mre_per_func_wvl_log[i])
-        axes[i].set_xlabel("Wavelength (nm)")
-        axes[i].set_ylabel("Log10(MRE)")
-        axes[i].set_ylim(-6, 6)
-        axes[i].set_title(f"Log10(MRE) for {globals.function_names_plots[i]} per wavelength")
-        axes[i].grid()
-    plt.tight_layout()
-    plt.savefig(save_path + f"{exp_id}_mre_functions_log.png", dpi=300, bbox_inches="tight")
-    plt.show()
-
-    # ---MRE PER FUNCTION PER WAVELENGTH LOG ZOOMED---
-    mre_per_func_wvl_log = np.log10(mre_per_func_wvl + 1e-10)  # add small value to avoid log(0)
-    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
-    plt.suptitle(exp_id, fontsize=16, y=1.02)
-    axes = axes.flatten()
-    for i in range(globals.N_FUNCTIONS):
-        axes[i].plot(wavelengths, mre_per_func_wvl_log[i])
-        axes[i].set_xlabel("Wavelength (nm)")
-        axes[i].set_ylabel("Log10(MRE)")
-        axes[i].set_ylim(-5, 1.5)
-        axes[i].set_title(f"Log10(MRE) for {globals.function_names_plots[i]} per wavelength (Zoomed)")
-        axes[i].grid()
-    plt.tight_layout()
-    plt.savefig(save_path + f"{exp_id}_mre_functions_log_zoomed.png", dpi=300, bbox_inches="tight")
-    plt.show()
-
+    if "amlec" not in save_path:
+        mre_per_func_wvl = mre_score(y_test, y_pred, wavelengths, axis=0)
+        fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+        plt.suptitle(exp_id, fontsize=16, y=1.02)
+        axes = axes.flatten()
+        for i in range(globals.N_FUNCTIONS):
+            axes[i].plot(wavelengths, mre_per_func_wvl[i])
+            axes[i].set_ylim(0, 1.25)
+            axes[i].set_xlabel("Wavelength (nm)")
+            axes[i].set_ylabel("MRE")
+            axes[i].set_title(f"MRE for {globals.function_names_plots[i]} per wavelength")
+            axes[i].grid()
+        plt.tight_layout()
+        plt.savefig(save_path + f"{exp_id}_mre_functions.png", dpi=300, bbox_inches="tight")
+        plt.show()
+    
+        # ---MRE PER FUNCTION PER WAVELENGTH LOG---
+        mre_per_func_wvl_log = np.log10(mre_per_func_wvl + 1e-10)  # add small value to avoid log(0)
+        fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+        plt.suptitle(exp_id, fontsize=16, y=1.02)
+        axes = axes.flatten()
+        for i in range(globals.N_FUNCTIONS):
+            axes[i].plot(wavelengths, mre_per_func_wvl_log[i])
+            axes[i].set_xlabel("Wavelength (nm)")
+            axes[i].set_ylabel("Log10(MRE)")
+            axes[i].set_ylim(-6, 6)
+            axes[i].set_title(f"Log10(MRE) for {globals.function_names_plots[i]} per wavelength")
+            axes[i].grid()
+        plt.tight_layout()
+        plt.savefig(save_path + f"{exp_id}_mre_functions_log.png", dpi=300, bbox_inches="tight")
+        plt.show()
+    
+        # ---MRE PER FUNCTION PER WAVELENGTH LOG ZOOMED---
+        mre_per_func_wvl_log = np.log10(mre_per_func_wvl + 1e-10)  # add small value to avoid log(0)
+        fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+        plt.suptitle(exp_id, fontsize=16, y=1.02)
+        axes = axes.flatten()
+        for i in range(globals.N_FUNCTIONS):
+            axes[i].plot(wavelengths, mre_per_func_wvl_log[i])
+            axes[i].set_xlabel("Wavelength (nm)")
+            axes[i].set_ylabel("Log10(MRE)")
+            axes[i].set_ylim(-5, 1.5)
+            axes[i].set_title(f"Log10(MRE) for {globals.function_names_plots[i]} per wavelength (Zoomed)")
+            axes[i].grid()
+        plt.tight_layout()
+        plt.savefig(save_path + f"{exp_id}_mre_functions_log_zoomed.png", dpi=300, bbox_inches="tight")
+        plt.show()
+    
     file_path = save_path + "mre_per_wvl_log.pkl"
     if os.path.exists(file_path):
         with open(file_path, "rb") as f:
