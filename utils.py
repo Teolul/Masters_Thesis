@@ -299,7 +299,7 @@ def mre_amlec(rho_ref: np.ndarray, rho_ret: np.ndarray, wvl: np.ndarray, axis: i
     Returns:
         float or np.ndarray: Mean relative error in percentage.
     """
-    re = 100.0 * np.abs(rho_ret - rho_ref) / rho_ref
+    re = np.abs(rho_ret - rho_ref) / rho_ref
 
     if axis is None:
         mask = ~(
@@ -315,6 +315,95 @@ def mre_amlec(rho_ref: np.ndarray, rho_ret: np.ndarray, wvl: np.ndarray, axis: i
         return np.nanmean(re, axis=0)
     else:
         raise ValueError("Invalid axis value. Must be None, 0, 1, or 2.")
+
+
+def mae_amlec(rho_ref: np.ndarray, rho_ret: np.ndarray, wvl: np.ndarray, axis: int | None = None) -> float | np.ndarray:
+    """
+    Computes the MAE counterpart of the Scenario A (Atmospheric Correction) error metric.
+    Calculates Mean Absolute Error (MAE) excluding specific absorption bands.
+    
+    Args:
+        rho_ref (np.ndarray): Reference reflectance, shape [n_wvl].
+        rho_ret (np.ndarray): Retrieved reflectance, shape [n_samples, n_wvl].
+        wvl (np.ndarray): Wavelengths, shape [1, n_wvl].
+        axis: None -> global scalar
+              1    -> per wavelength
+
+    Returns:
+        float or np.ndarray: Mean absolute error.
+    """
+    ae = np.abs(rho_ret - rho_ref)
+
+    if axis is None:
+        mask = ~(
+            ((wvl > 931) & (wvl < 945)) |
+            ((wvl > 1100) & (wvl < 1160)) |
+            ((wvl > 1300) & (wvl < 1500)) |
+            ((wvl > 1750) & (wvl < 1980)) |
+            (wvl > 2420)
+        )
+        ae_mean = np.nanmean(ae, axis=0, keepdims=True)
+        return np.nanmean(ae_mean.flatten()[mask.flatten()])
+    elif axis == 1:
+        return np.nanmean(ae, axis=0)
+    else:
+        raise ValueError("Invalid axis value. Must be None, 0, 1, or 2.")
+
+
+def propagate_reflectance_uncertainty(Ltoa, Y_pred, Y_std, sza, n_wvl):
+    """
+    Analytical (delta-method) propagation of transfer-function uncertainty
+    into reflectance uncertainty, assuming independence between the six functions.
+
+    Args:
+        Ltoa: (n_samples, n_wvl)
+        Y_pred: (n_samples, 6*n_wvl) predicted transfer-function means
+        Y_std:  (n_samples, 6*n_wvl) predicted transfer-function std devs (same layout as Y_pred)
+        sza: (n_samples, 1)
+        n_wvl: int
+
+    Returns:
+        rho_std: (n_samples, n_wvl)
+    """
+    L0    = Y_pred[:, 0:n_wvl]
+    Edir  = Y_pred[:, n_wvl:2*n_wvl]
+    Edif  = Y_pred[:, 2*n_wvl:3*n_wvl]
+    Sa    = Y_pred[:, 3*n_wvl:4*n_wvl]
+    Tdir  = Y_pred[:, 4*n_wvl:5*n_wvl]
+    Tdif  = Y_pred[:, 5*n_wvl:6*n_wvl]
+
+    s_L0   = Y_std[:, 0:n_wvl]
+    s_Edir = Y_std[:, n_wvl:2*n_wvl]
+    s_Edif = Y_std[:, 2*n_wvl:3*n_wvl]
+    s_Sa   = Y_std[:, 3*n_wvl:4*n_wvl]
+    s_Tdir = Y_std[:, 4*n_wvl:5*n_wvl]
+    s_Tdif = Y_std[:, 5*n_wvl:6*n_wvl]
+
+    cos_sza = np.cos(np.radians(sza))  # (n_samples, 1), broadcasts against (n_samples, n_wvl)
+
+    E_total = Edir * cos_sza + Edif
+    T_total = Tdir + Tdif
+    N = np.pi * (Ltoa - L0)
+    D = E_total * T_total + N * Sa
+    rho = N / D
+
+    d_L0   = -np.pi * E_total * T_total / D**2
+    d_Sa   = -rho**2
+    d_Edir = -rho * T_total * cos_sza / D
+    d_Edif = -rho * T_total / D
+    d_Tdir = -rho * E_total / D
+    d_Tdif = -rho * E_total / D
+
+    var_rho = (
+        (d_L0   * s_L0)**2 +
+        (d_Edir * s_Edir)**2 +
+        (d_Edif * s_Edif)**2 +
+        (d_Sa   * s_Sa)**2 +
+        (d_Tdir * s_Tdir)**2 +
+        (d_Tdif * s_Tdif)**2
+    )
+
+    return np.sqrt(var_rho)
 
 
 def build_mask(wavelengths):
@@ -938,14 +1027,23 @@ def show_test_results_mae(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_pat
     - inputs: true test outputs, predicted test outputs, wavelengths
     - outputs: prints MAE scores and displays plots of MAE per wavelength and per function
     """
-    mae = mae_score(y_test, y_pred, wavelengths)
+    if "amlec" in save_path:
+        mae = mae_amlec(y_test, y_pred, wavelengths)
+    else:
+        mae = mae_score(y_test, y_pred, wavelengths)
     print("Testing MAE:", mae)
 
-    mae_per_func = mae_score(y_test, y_pred, wavelengths, axis=2)
-    for i in range(globals.N_FUNCTIONS):
-        print(f"{globals.function_names_plots[i]} MAE: {mae_per_func[i]:.4f}")
+    if "amlec" not in save_path:
+        mae_per_func = mae_score(y_test, y_pred, wavelengths, axis=2)
+        for i in range(globals.N_FUNCTIONS):
+            print(f"{globals.function_names_plots[i]} MAE: {mae_per_func[i]:.4f}")
+    else:
+        mae_per_func = None
 
-    mae_per_wvl = mae_score(y_test, y_pred, wavelengths, axis=1)
+    if "amlec" in save_path:
+        mae_per_wvl = mae_amlec(y_test, y_pred, wavelengths, axis=1)
+    else:
+        mae_per_wvl = mae_score(y_test, y_pred, wavelengths, axis=1)
     plt.figure(figsize=(10, 5))
     plt.suptitle(exp_id, fontsize=16, y=1.02)
     plt.plot(wavelengths, mae_per_wvl)
@@ -956,19 +1054,20 @@ def show_test_results_mae(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_pat
     plt.savefig(save_path + f"{exp_id}_mae_wavelengths.png", dpi=300, bbox_inches="tight")
     plt.show()
 
-    mae_per_func_wvl = mae_score(y_test, y_pred, wavelengths, axis=0)
-    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
-    plt.suptitle(exp_id, fontsize=16, y=1.02)
-    axes = axes.flatten()
-    for i in range(globals.N_FUNCTIONS):
-        axes[i].plot(wavelengths, mae_per_func_wvl[i])
-        axes[i].set_xlabel("Wavelength (nm)")
-        axes[i].set_ylabel("MAE")
-        axes[i].set_title(f"MAE for {globals.function_names_plots[i]} per wavelength")
-        axes[i].grid()
-    plt.tight_layout()
-    plt.savefig(save_path + f"{exp_id}_mae_functions.png", dpi=300, bbox_inches="tight")
-    plt.show()
+    if "amlec" not in save_path:
+        mae_per_func_wvl = mae_score(y_test, y_pred, wavelengths, axis=0)
+        fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+        plt.suptitle(exp_id, fontsize=16, y=1.02)
+        axes = axes.flatten()
+        for i in range(globals.N_FUNCTIONS):
+            axes[i].plot(wavelengths, mae_per_func_wvl[i])
+            axes[i].set_xlabel("Wavelength (nm)")
+            axes[i].set_ylabel("MAE")
+            axes[i].set_title(f"MAE for {globals.function_names_plots[i]} per wavelength")
+            axes[i].grid()
+        plt.tight_layout()
+        plt.savefig(save_path + f"{exp_id}_mae_functions.png", dpi=300, bbox_inches="tight")
+        plt.show()
 
     file_path = save_path + "mae_per_wvl.pkl"
     if os.path.exists(file_path):
@@ -1044,6 +1143,68 @@ def show_residuals(y_test, y_pred, wavelengths, exp_id="EXP_ID", save_path="nn_s
 
     plt.tight_layout()
     plt.savefig(save_path + f"{exp_id}_residuals.png", dpi=300, bbox_inches="tight")
+    plt.show()
+
+
+def show_predicted_vs_true_reflectance(rho_ref, rho_ret, rho_std, wavelengths, exp_id="EXP_ID", save_path="gp_saves/amlec_testing_results/single_kernel/"):
+    """
+    Show the reference vs retrieved reflectance across all samples, with optional uncertainty bands.
+    - inputs: reference reflectance (rho_ref, shape [n_wvl]), retrieved reflectance
+      (rho_ret, shape [n_samples, n_wvl]), propagated std dev (rho_std, optional,
+      shape [n_samples, n_wvl]), wavelengths
+    - outputs: displays a single plot of mean retrieved vs reference reflectance
+    """
+    # --- compute mean retrieved reflectance across all samples ---
+    rho_ret_mean = np.mean(rho_ret, axis=0)   # shape: (n_wvl,)
+    if rho_std is not None:
+        rho_std_mean = np.mean(rho_std, axis=0)   # shape: (n_wvl,)
+
+    plt.figure(figsize=(10, 6))
+    plt.suptitle(f"Mean Retrieved vs Reference Reflectance — {exp_id}", fontsize=16, y=1.02)
+
+    plt.plot(wavelengths, rho_ret_mean, label="Mean Retrieved")
+    if rho_std is not None:
+        # with Gaussian prior, 2 standard deviations should cover ~95% of the true reflectance values
+        plt.fill_between(wavelengths, rho_ret_mean - 2 * rho_std_mean, rho_ret_mean + 2 * rho_std_mean, color="blue", alpha=0.2, label="Retrieved Std Dev")
+    plt.plot(wavelengths, rho_ref, label="Reference")
+
+    plt.title("Reflectance")
+    plt.xlabel("Wavelength (nm)")
+    plt.ylabel("Reflectance")
+    plt.ylim(0, 1)
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig(save_path + f"{exp_id}_predicted_vs_true_reflectance.png", dpi=300, bbox_inches="tight")
+    plt.show()
+
+
+def show_residuals_reflectance(rho_ref, rho_ret, wavelengths, exp_id="EXP_ID", save_path="gp_saves/amlec_testing_results/single_kernel/"):
+    """
+    Show the residuals of the retrieved reflectance on the test set.
+    - inputs: reference reflectance (rho_ref, shape [n_wvl]), retrieved reflectance
+      (rho_ret, shape [n_samples, n_wvl]), wavelengths
+    - outputs: displays a single plot of mean reflectance residuals
+    """
+    # --- residuals for all samples ---
+    residuals = rho_ret - rho_ref   # shape: (n_samples, n_wvl)
+
+    # mean residual across samples
+    mean_residuals = np.mean(residuals, axis=0)  # shape: (n_wvl,)
+
+    plt.figure(figsize=(10, 6))
+    plt.suptitle(f"Reflectance Residuals — {exp_id}", fontsize=16, y=1.02)
+
+    plt.plot(wavelengths, mean_residuals)
+    plt.axhline(0, linestyle="--")
+
+    plt.title("Mean Residuals - Reflectance")
+    plt.xlabel("Wavelength (nm)")
+    plt.ylabel("Prediction Error")
+    plt.ylim(-0.1, 0.1)
+
+    plt.tight_layout()
+    plt.savefig(save_path + f"{exp_id}_residuals_reflectance.png", dpi=300, bbox_inches="tight")
     plt.show()
 
 
