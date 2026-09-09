@@ -677,7 +677,7 @@ def show_fit_val_summary(results_df, title="Results Summary", save_path="nn_save
 def show_test_summary(results_df, title="Results Summary", save_path="nn_saves/nn_results_analysis.png"):
     if results_df["experiment_id"].str.startswith("DotProduct_", na=False).any():
         plot_results_df = results_df[
-            ~results_df["experiment_id"].str.startswith(("DotProduct_", "Matern_iso"), na=False)
+            ~results_df["experiment_id"].str.startswith(("DotProduct_", "Matern_iso", "GP"), na=False)
         ]
     else:
         plot_results_df = results_df.copy()
@@ -768,16 +768,16 @@ def show_test_summary(results_df, title="Results Summary", save_path="nn_saves/n
     mae_pivot = avg_test_mae.pivot(index="dataset_size", columns="model", values="avg_test_mae")
     inf_pivot = avg_inference_time.set_index("dataset_size")[["avg_inference_time"]]
 
-    fig, axes = plt.subplots(1, 3, figsize=(18, 9))
+    fig, axes = plt.subplots(1, 3 if "amlec" not in save_path else 2, figsize=(18, 9))
     fig.suptitle(title, fontsize=14, y=1.02)
 
     x      = np.arange(len(dataset_sizes))
     n_mdl  = len(models)
-    width  = 0.15
+    width  = 0.13
     offsets = np.linspace(-(n_mdl - 1) / 2, (n_mdl - 1) / 2, n_mdl) * width
 
 
-    def _grouped_bars(ax, pivot, ylabel, title, factor=100):
+    def _grouped_bars(ax, pivot, ylabel, title, factor=100, decimals=2):
         for i, mdl in enumerate(models):
             vals = pivot[mdl].values if mdl in pivot.columns else np.zeros(len(dataset_sizes))
             bars = ax.bar(x + offsets[i], vals, width, label=mdl,
@@ -785,7 +785,7 @@ def show_test_summary(results_df, title="Results Summary", save_path="nn_saves/n
             for bar in bars:
                 h = bar.get_height()
                 ax.text(bar.get_x() + bar.get_width() / 2, h * 1.015,
-                        f"{h*factor:.2f}", ha="center", va="bottom", fontsize=8)
+                        f"{h*factor:.{decimals}f}", ha="center", va="bottom", fontsize=8)
         ax.set_xticks(x)
         ax.set_xticklabels([str(s) for s in dataset_sizes])
         ax.set_xlabel("Dataset Size")
@@ -800,22 +800,23 @@ def show_test_summary(results_df, title="Results Summary", save_path="nn_saves/n
     _grouped_bars(axes[0], mre_pivot, "Avg Test MRE (%)", "Test MRE by Model & Dataset Size")
 
     # panel 2 — pal MAE
-    _grouped_bars(axes[1], mae_pivot, "Avg Test MAE", "Test MAE by Model & Dataset Size", factor=1)
+    _grouped_bars(axes[1], mae_pivot, "Avg Test MAE", "Test MAE by Model & Dataset Size", factor=1, decimals=4 if "amlec" in save_path else 2)
 
-    # panel 3 — inference time (single series, no model split)
-    inf_vals = [inf_pivot.loc[s, "avg_inference_time"] for s in dataset_sizes]
-    bars = axes[2].bar(x, inf_vals, width=0.45, alpha=0.88, linewidth=0)
-    for bar in bars:
-        h = bar.get_height()
-        axes[2].text(bar.get_x() + bar.get_width() / 2, h * 1.015,
-                    f"{h:.3f}s", ha="center", va="bottom", fontsize=8.5)
-    axes[2].set_xticks(x)
-    axes[2].set_xticklabels([str(s) for s in dataset_sizes])
-    axes[2].set_xlabel("Dataset Size")
-    axes[2].set_ylabel("Avg Inference Time (s)")
-    axes[2].set_title("Average Inference Time by Dataset Size", fontweight="bold", pad=10)
-    axes[2].yaxis.grid(True)
-    axes[2].set_axisbelow(True)
+    if "amlec" not in save_path:
+        # panel 3 — inference time (single series, no model split)
+        inf_vals = [inf_pivot.loc[s, "avg_inference_time"] for s in dataset_sizes]
+        bars = axes[2].bar(x, inf_vals, width=0.45, alpha=0.88, linewidth=0)
+        for bar in bars:
+            h = bar.get_height()
+            axes[2].text(bar.get_x() + bar.get_width() / 2, h * 1.015,
+                        f"{h:.3f}s", ha="center", va="bottom", fontsize=8.5)
+        axes[2].set_xticks(x)
+        axes[2].set_xticklabels([str(s) for s in dataset_sizes])
+        axes[2].set_xlabel("Dataset Size")
+        axes[2].set_ylabel("Avg Inference Time (s)")
+        axes[2].set_title("Average Inference Time by Dataset Size", fontweight="bold", pad=10)
+        axes[2].yaxis.grid(True)
+        axes[2].set_axisbelow(True)
 
     plt.tight_layout()
     plt.savefig(save_path, dpi=300, bbox_inches="tight")
@@ -1209,7 +1210,7 @@ def show_residuals_reflectance(rho_ref, rho_ret, wavelengths, exp_id="EXP_ID", s
 
 
 def show_multiple_experiments_errors(errors_per_wvl, wavelengths, xlims=[], ylims=[], ylabel="Error", title="Errors"):
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(10, 6), dpi=300)
     for exp_id, err_per_wvl in errors_per_wvl.items():
         plt.plot(wavelengths, err_per_wvl, label=exp_id)
     plt.xlabel("Wavelength (nm)")
