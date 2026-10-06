@@ -12,6 +12,7 @@ from collections import defaultdict
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 
 import torch
 
@@ -773,7 +774,7 @@ def show_test_summary(results_df, title="Results Summary", save_path="nn_saves/n
 
     x      = np.arange(len(dataset_sizes))
     n_mdl  = len(models)
-    width  = 0.13
+    width  = 0.12
     offsets = np.linspace(-(n_mdl - 1) / 2, (n_mdl - 1) / 2, n_mdl) * width
 
 
@@ -791,6 +792,7 @@ def show_test_summary(results_df, title="Results Summary", save_path="nn_saves/n
         ax.set_xlabel("Dataset Size")
         ax.set_ylabel(ylabel)
         ax.set_title(title, fontweight="bold", pad=10)
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda v, pos: f"{v*factor:.{decimals}f}"))
         ax.yaxis.grid(True)
         ax.set_axisbelow(True)
         ax.legend(fontsize=7.5, loc="upper right")
@@ -865,11 +867,12 @@ def show_barplot_results(results_df, title="Bar Plot of Results", save_path="nn_
 
     results_sorted = plot_results_df.sort_values(mre_to_consider, ascending=True)
 
-    plt.figure(figsize=(12, 6))
+    plt.figure(figsize=(12, 6), dpi=300)
     plt.bar(range(len(results_sorted)), results_sorted[mre_to_consider], color="skyblue")
     plt.xlabel("Parameter Combination ID")
-    plt.ylabel("Val MRE")
+    plt.ylabel("MRE (%)")
     plt.title(title)
+    plt.gca().yaxis.set_major_formatter(FuncFormatter(lambda v, pos: f"{v*100:.{2}f}"))
     plt.xticks(range(len(results_sorted)), results_sorted["experiment_id"], rotation=90)
     plt.tight_layout()
     plt.savefig(save_path, dpi=300, bbox_inches="tight")
@@ -1209,7 +1212,7 @@ def show_residuals_reflectance(rho_ref, rho_ret, wavelengths, exp_id="EXP_ID", s
     plt.show()
 
 
-def show_multiple_experiments_errors(errors_per_wvl, wavelengths, xlims=[], ylims=[], ylabel="Error", title="Errors"):
+def show_multiple_experiments_errors(errors_per_wvl, wavelengths, save_path="./", xlims=[], ylims=[], ylabel="Error", title="Errors"):
     plt.figure(figsize=(10, 6), dpi=300)
     for exp_id, err_per_wvl in errors_per_wvl.items():
         plt.plot(wavelengths, err_per_wvl, label=exp_id)
@@ -1217,12 +1220,17 @@ def show_multiple_experiments_errors(errors_per_wvl, wavelengths, xlims=[], ylim
     plt.ylabel(ylabel)
     if len(xlims) > 0:
         plt.xlim(xlims[0], xlims[1])
+        mask = (wavelengths >= xlims[0]) & (wavelengths <= xlims[1])
     if len(ylims) > 0:
         plt.ylim(ylims[0], ylims[1])
+    else:
+        errors_in_region = np.concatenate([err_per_wvl[mask] for err_per_wvl in errors_per_wvl.values()])
+        plt.ylim(np.min(errors_in_region) - 0.1, np.max(errors_in_region) + 0.1)
     plt.title(title)
     plt.grid()
     plt.legend()
     plt.tight_layout()
+    plt.savefig(save_path, dpi=300, bbox_inches="tight")
     plt.show()
 
 #endregion
