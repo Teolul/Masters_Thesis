@@ -12,7 +12,7 @@ The following are the hardware specifications of the main computer used to run t
   <li><b>GPU</b>: NVIDIA GeForce RTX 4060 Ti (8 GB of VRAM)</li>
   <li><b>CPU</b>: AMD RYZEN 9 7900 (3.70 GHz, 12 cores)</li>
   <li><b>RAM</b>: 32 GB DDR5 with 4800 MT/s</li>
-  <li><b>Storage</b>: Crucial P310 SSD 2 NVMe pcie 4.0</li>
+  <li><b>Storage</b>: SSD Crucial P310 1TB PCIe M.2</li>
 </ul>
 
 ### Thesis Reference
