@@ -10,6 +10,15 @@ import globals
 
 class Encoder(nn.Module):
     def __init__(self, z_dim=128):
+        """Initialize the Encoder module.
+
+        Args:
+            self: Current model instance.
+            z_dim: Latent representation dimension.
+
+        Returns:
+            None. Initializes the module.
+        """
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(globals.N_INPUTS, 64),
@@ -21,12 +30,32 @@ class Encoder(nn.Module):
         )
 
     def forward(self, x):
+        """Run the Encoder forward computation.
+
+        Args:
+            self: Current model instance.
+            x: Input tensor or input collection.
+
+        Returns:
+            Model output tensor.
+        """
         return self.net(x)
 
 
 # 1st ARCHITECTURE: upsample convolutions to reconstruct the full spectrum from a low-dimensional latent space calculated from the 9 inputs
 class SpectralDecoder1(nn.Module):
     def __init__(self, z_dim=128, channels=16, initial_length=32):
+        """Initialize the SpectralDecoder1 module.
+
+        Args:
+            self: Current model instance.
+            z_dim: Latent representation dimension.
+            channels: Number of convolutional channels.
+            initial_length: Initial decoded sequence length.
+
+        Returns:
+            None. Initializes the module.
+        """
         super().__init__()
         self.fc = nn.Linear(z_dim, channels * initial_length)
         self.initial_length = initial_length
@@ -59,6 +88,15 @@ class SpectralDecoder1(nn.Module):
         self.final_conv = nn.Conv1d(8, 1, kernel_size=5, padding=2)
 
     def forward(self, z):
+        """Run the SpectralDecoder1 forward computation.
+
+        Args:
+            self: Current model instance.
+            z: Encoded latent tensor.
+
+        Returns:
+            Model output tensor.
+        """
         x = self.fc(z).view(z.size(0), self.channels, self.initial_length)
         x = self.initial_conv(x)
         x = self.upsample_pipeline(x)  # (N, 8, 4096)
@@ -74,6 +112,15 @@ class SpectralDecoder1(nn.Module):
     
 class EmulatorSet1(nn.Module):
     def __init__(self, encoder_type="single"):
+        """Initialize the EmulatorSet1 module.
+
+        Args:
+            self: Current model instance.
+            encoder_type: Encoder architecture variant.
+
+        Returns:
+            None. Initializes the module.
+        """
         super().__init__()
         self.encoder_type = encoder_type
         if encoder_type == "single":
@@ -89,6 +136,15 @@ class EmulatorSet1(nn.Module):
         ])
 
     def forward(self, x):
+        """Run the EmulatorSet1 forward computation.
+
+        Args:
+            self: Current model instance.
+            x: Input tensor or input collection.
+
+        Returns:
+            Model output tensor.
+        """
         if self.encoder_type == "single":
             z = self.encoder(x)
             outputs = [
@@ -109,6 +165,18 @@ class EmulatorSet1(nn.Module):
 # technically wrong, as the PCA-reduced space doesn't have a true spatial structure, but it allows us to experiment with convolutional processing
 class SpectralDecoder2(nn.Module):
     def __init__(self, z_dim=128, n_components=10, initial_length=32, channels=16):
+        """Initialize the SpectralDecoder2 module.
+
+        Args:
+            self: Current model instance.
+            z_dim: Latent representation dimension.
+            n_components: Number of retained PCA components.
+            initial_length: Initial decoded sequence length.
+            channels: Number of convolutional channels.
+
+        Returns:
+            None. Initializes the module.
+        """
         super().__init__()
         self.initial_length = initial_length
         self.channels = channels
@@ -138,6 +206,15 @@ class SpectralDecoder2(nn.Module):
         )
 
     def forward(self, z):
+        """Run the SpectralDecoder2 forward computation.
+
+        Args:
+            self: Current model instance.
+            z: Value used by this model component.
+
+        Returns:
+            Model output tensor.
+        """
         x = self.fc(z)
         x = x.view(z.size(0), self.channels, self.initial_length)
         x = self.cnn(x)
@@ -146,6 +223,16 @@ class SpectralDecoder2(nn.Module):
     
 class EmulatorSet2(nn.Module):
     def __init__(self, encoder_type="single", n_components=10):
+        """Initialize the EmulatorSet2 module.
+
+        Args:
+            self: Current model instance.
+            encoder_type: Encoder architecture variant.
+            n_components: Number of retained PCA components.
+
+        Returns:
+            None. Initializes the module.
+        """
         super().__init__()
         self.encoder_type = encoder_type
         if encoder_type == "single":
@@ -161,6 +248,15 @@ class EmulatorSet2(nn.Module):
         ])
 
     def forward(self, x):
+        """Run the EmulatorSet2 forward computation.
+
+        Args:
+            self: Current model instance.
+            x: Input tensor or input collection.
+
+        Returns:
+            Model output tensor.
+        """
         if self.encoder_type == "single":
             z = self.encoder(x)
             outputs = [
@@ -179,6 +275,16 @@ class EmulatorSet2(nn.Module):
 # 3rd ARCHITECTURE: directly predict the PCA coefficients for each function from the latent space with MLP, without upsampling convolutions
 class SpectralDecoder3(nn.Module):
     def __init__(self, z_dim=128, n_components=10):
+        """Initialize the SpectralDecoder3 module.
+
+        Args:
+            self: Current model instance.
+            z_dim: Latent representation dimension.
+            n_components: Number of retained PCA components.
+
+        Returns:
+            None. Initializes the module.
+        """
         super().__init__()
         # map the latent space to the PCA coefficients
         self.net = nn.Sequential(
@@ -190,10 +296,29 @@ class SpectralDecoder3(nn.Module):
         )
 
     def forward(self, z):
+        """Run the SpectralDecoder3 forward computation.
+
+        Args:
+            self: Current model instance.
+            z: Value used by this model component.
+
+        Returns:
+            Model output tensor.
+        """
         return self.net(z)
 
 class EmulatorSet3(nn.Module):
     def __init__(self, encoder_type="single", n_components=10):
+        """Initialize the EmulatorSet3 module.
+
+        Args:
+            self: Current model instance.
+            encoder_type: Encoder architecture variant.
+            n_components: Number of retained PCA components.
+
+        Returns:
+            None. Initializes the module.
+        """
         super().__init__()
         self.encoder_type = encoder_type
         if encoder_type == "single":
@@ -208,6 +333,15 @@ class EmulatorSet3(nn.Module):
         ])
 
     def forward(self, x):
+        """Run the EmulatorSet3 forward computation.
+
+        Args:
+            self: Current model instance.
+            x: Input tensor or input collection.
+
+        Returns:
+            Model output tensor.
+        """
         if self.encoder_type == "single":
             z = self.encoder(x)
             outputs = [
@@ -226,6 +360,16 @@ class EmulatorSet3(nn.Module):
 # 4th ARCHITECTURE: use squeeze and excite blocks to allow the model to learn which latent features are most important for each function, before predicting PCA coefficients
 class SEBlock(nn.Module):
     def __init__(self, channels, reduction=8):
+        """Initialize the SEBlock module.
+
+        Args:
+            self: Current model instance.
+            channels: Number of convolutional channels.
+            reduction: Channel reduction factor.
+
+        Returns:
+            None. Initializes the module.
+        """
         super().__init__()
 
         self.fc = nn.Sequential(
@@ -236,11 +380,30 @@ class SEBlock(nn.Module):
         )
 
     def forward(self, x):
+        """Run the SEBlock forward computation.
+
+        Args:
+            self: Current model instance.
+            x: Input tensor or input collection.
+
+        Returns:
+            Model output tensor.
+        """
         weights = self.fc(x)
         return x * weights
     
 class SpectralDecoder4(nn.Module):
     def __init__(self, z_dim=128, n_components=10):
+        """Initialize the SpectralDecoder4 module.
+
+        Args:
+            self: Current model instance.
+            z_dim: Latent representation dimension.
+            n_components: Number of retained PCA components.
+
+        Returns:
+            None. Initializes the module.
+        """
         super().__init__()
 
         self.se = SEBlock(z_dim)
@@ -254,11 +417,30 @@ class SpectralDecoder4(nn.Module):
         )
 
     def forward(self, z):
+        """Run the SpectralDecoder4 forward computation.
+
+        Args:
+            self: Current model instance.
+            z: Value used by this model component.
+
+        Returns:
+            Model output tensor.
+        """
         z = self.se(z)
         return self.mlp(z)
     
 class EmulatorSet4(nn.Module):
     def __init__(self, encoder_type="single", n_components=10):
+        """Initialize the EmulatorSet4 module.
+
+        Args:
+            self: Current model instance.
+            encoder_type: Encoder architecture variant.
+            n_components: Number of retained PCA components.
+
+        Returns:
+            None. Initializes the module.
+        """
         super().__init__()
 
         self.encoder_type = encoder_type
@@ -275,6 +457,15 @@ class EmulatorSet4(nn.Module):
         ])
 
     def forward(self, x):
+        """Run the EmulatorSet4 forward computation.
+
+        Args:
+            self: Current model instance.
+            x: Input tensor or input collection.
+
+        Returns:
+            Model output tensor.
+        """
         if self.encoder_type == "single":
             z = self.encoder(x)
             outputs = [
@@ -295,6 +486,16 @@ class ResidualFCBlock(nn.Module):
     Learns a residual on top of an identity/linear-projected input instead
     of having to reconstruct the full mapping from scratch."""
     def __init__(self, in_dim, out_dim):
+        """Initialize the ResidualFCBlock module.
+
+        Args:
+            self: Current model instance.
+            in_dim: Input feature dimension.
+            out_dim: Output feature dimension.
+
+        Returns:
+            None. Initializes the module.
+        """
         super().__init__()
         self.fc = nn.Linear(in_dim, out_dim)
         self.act = nn.SiLU()
@@ -304,6 +505,15 @@ class ResidualFCBlock(nn.Module):
         )
  
     def forward(self, x):
+        """Run the ResidualFCBlock forward computation.
+
+        Args:
+            self: Current model instance.
+            x: Input tensor or input collection.
+
+        Returns:
+            Model output tensor.
+        """
         return self.act(self.fc(x) + self.skip(x))
  
  
@@ -313,6 +523,21 @@ class ResidualConv1D(nn.Module):
     resamples to the exact output length of the main path, so it works
     uniformly whether the block upsamples or keeps length fixed."""
     def __init__(self, in_ch, out_ch, kernel_size, stride, padding, num_groups, transpose=True):
+        """Initialize the ResidualConv1D module.
+
+        Args:
+            self: Current model instance.
+            in_ch: Input channel count.
+            out_ch: Output channel count.
+            kernel_size: Convolution kernel size.
+            stride: Convolution stride.
+            padding: Convolution padding.
+            num_groups: Number of normalization groups.
+            transpose: Whether to use a transposed convolution.
+
+        Returns:
+            None. Initializes the module.
+        """
         super().__init__()
         conv_cls = nn.ConvTranspose1d if transpose else nn.Conv1d
         self.conv = conv_cls(in_ch, out_ch, kernel_size=kernel_size, stride=stride, padding=padding)
@@ -324,6 +549,15 @@ class ResidualConv1D(nn.Module):
         )
  
     def forward(self, x):
+        """Run the ResidualConv1D forward computation.
+
+        Args:
+            self: Current model instance.
+            x: Input tensor or input collection.
+
+        Returns:
+            Model output tensor.
+        """
         main = self.conv(x)
         skip = self.skip_proj(x)
         if skip.shape[-1] != main.shape[-1]:
@@ -342,11 +576,29 @@ class FunctionMixer(nn.Module):
     mapping (delta = 0), meaning training starts out identical to fully
     independent decoders and only begins mixing once it's useful."""
     def __init__(self, n_functions):
+        """Initialize the FunctionMixer module.
+
+        Args:
+            self: Current model instance.
+            n_functions: Number of transfer functions.
+
+        Returns:
+            None. Initializes the module.
+        """
         super().__init__()
         self.n_functions = n_functions
         self.delta = nn.Parameter(torch.zeros(n_functions, n_functions))
  
     def forward(self, feats_list):
+        """Run the FunctionMixer forward computation.
+
+        Args:
+            self: Current model instance.
+            feats_list: Feature tensors, one per transfer function.
+
+        Returns:
+            Feature tensor list after cross-function mixing.
+        """
         x = torch.stack(feats_list, dim=1)
         f = x.shape[1]
         mix = torch.eye(f, device=x.device, dtype=x.dtype) + self.delta
@@ -381,6 +633,17 @@ class GlobalSpectralResidual(nn.Module):
     FunctionMixer.
     """
     def __init__(self, z_dim, spectrum_len, n_modes=8):
+        """Initialize the GlobalSpectralResidual module.
+
+        Args:
+            self: Current model instance.
+            z_dim: Latent representation dimension.
+            spectrum_len: Output spectrum length.
+            n_modes: Number of spectral modes.
+
+        Returns:
+            None. Initializes the module.
+        """
         super().__init__()
         self.n_modes = n_modes
         self.coeff_head = nn.Linear(z_dim, n_modes)
@@ -388,6 +651,15 @@ class GlobalSpectralResidual(nn.Module):
         self.gate = nn.Parameter(torch.zeros(1))
  
     def forward(self, z):
+        """Run the GlobalSpectralResidual forward computation.
+
+        Args:
+            self: Current model instance.
+            z: Value used by this model component.
+
+        Returns:
+            Model output tensor.
+        """
         coeffs = self.coeff_head(z)
         correction = coeffs @ self.basis
         return self.gate * correction
@@ -399,7 +671,14 @@ class GlobalSpectralResidual(nn.Module):
         Seeds self.basis with the leading right-singular vectors of the
         centered data -- equivalent to the leading eigenvectors of the
         (spectrum_len x spectrum_len) covariance matrix, but computed
-        without ever forming that matrix."""
+        without ever forming that matrix.
+
+        Args:
+            spectra: Batch of real target spectra used to seed the basis.
+
+        Returns:
+            None. Updates the stored basis in place.
+        """
         mean = spectra.mean(dim=0, keepdim=True)
         centered = spectra - mean
         _, _, Vt = torch.linalg.svd(centered, full_matrices=False)
@@ -410,7 +689,15 @@ def _wavelength_to_index(wl, wavelengths):
     """Index of the closest sample in `wavelengths` (a 1D tensor covering
     the full spectrum) to wavelength `wl` (nm), clamped so a wl at or below
     the grid minimum maps to index 0, and a wl at or above the grid maximum
-    maps to len(wavelengths) (an exclusive stop covering the last sample)."""
+    maps to len(wavelengths) (an exclusive stop covering the last sample).
+
+    Args:
+        wl: Wavelength value to locate on the grid.
+        wavelengths: One-dimensional wavelength grid.
+
+    Returns:
+        Index of the nearest sample, or the exclusive upper bound at the grid maximum.
+    """
     if wl <= wavelengths[0]:
         return 0
     if wl >= wavelengths[-1]:
@@ -436,6 +723,20 @@ class RegionBranchingBlock(nn.Module):
     """
  
     def __init__(self, in_ch, mid_ch, in_len, wavelengths, regions, num_groups):
+        """Initialize the RegionBranchingBlock module.
+
+        Args:
+            self: Current model instance.
+            in_ch: Input channel count.
+            mid_ch: Intermediate channel count.
+            in_len: Input sequence length.
+            wavelengths: Wavelength coordinates.
+            regions: Spectral regions used to configure the decoder.
+            num_groups: Number of normalization groups.
+
+        Returns:
+            None. Initializes the module.
+        """
         super().__init__()
         wavelengths = torch.as_tensor(wavelengths, dtype=torch.float32)
         out_len = wavelengths.shape[0]
@@ -483,6 +784,15 @@ class RegionBranchingBlock(nn.Module):
         self.act = nn.SiLU()
  
     def forward(self, x):
+        """Run the RegionBranchingBlock forward computation.
+
+        Args:
+            self: Current model instance.
+            x: Input tensor or input collection.
+
+        Returns:
+            Model output tensor.
+        """
         mid_segs, bounds = [], []
         for (i0, i1, o0, o1), up, norm in zip(self._bounds, self.up_branches, self.norms):
             seg = x[:, :, i0:i1]
@@ -506,12 +816,30 @@ class RegionBranchingBlock(nn.Module):
  
 class Encoder5(nn.Module):
     def __init__(self, z_dim=28):
+        """Initialize the Encoder5 module.
+
+        Args:
+            self: Current model instance.
+            z_dim: Latent representation dimension.
+
+        Returns:
+            None. Initializes the module.
+        """
         super().__init__()
         self.block1 = ResidualFCBlock(9, 64)
         self.block2 = ResidualFCBlock(64, 128)
         self.block3 = ResidualFCBlock(128, z_dim)
  
     def forward(self, x):
+        """Run the Encoder5 forward computation.
+
+        Args:
+            self: Current model instance.
+            x: Input tensor or input collection.
+
+        Returns:
+            Model output tensor.
+        """
         x = self.block1(x)
         x = self.block2(x)
         x = self.block3(x)
@@ -521,6 +849,21 @@ class Encoder5(nn.Module):
 class SpectralDecoder5(nn.Module):
     def __init__(self, z_dim=28, channels=28, initial_length=32, spectrum_len=4205,
                  n_global_modes=4, region_config=None, wavelengths=None):
+        """Initialize the SpectralDecoder5 module.
+
+        Args:
+            self: Current model instance.
+            z_dim: Latent representation dimension.
+            channels: Number of convolutional channels.
+            initial_length: Initial decoded sequence length.
+            spectrum_len: Output spectrum length.
+            n_global_modes: Number of global spectral modes.
+            region_config: Spectral region configuration for the decoder.
+            wavelengths: Wavelength coordinates.
+
+        Returns:
+            None. Initializes the module.
+        """
         super().__init__()
         self.fc = nn.Linear(z_dim, channels * initial_length)
         self.initial_length = initial_length
@@ -552,7 +895,14 @@ class SpectralDecoder5(nn.Module):
         """fc -> initial_conv. Returns the intermediate tensor plus the
         feats collected so far. This is the hand-off point where
         EmulatorSet5 lets the 6 branches exchange information before
-        they continue independently."""
+        they continue independently.
+
+        Args:
+            z: Encoded latent tensor for each transfer function.
+
+        Returns:
+            Intermediate feature tensor and global spectral correction.
+        """
         feats = {}
         x = self.fc(z).view(z.size(0), self.channels, self.initial_length)
         # feats["32"] = x
@@ -564,7 +914,15 @@ class SpectralDecoder5(nn.Module):
  
     def decode_stage2(self, x, global_correction):
         """up1 ... final_conv, continuing from decode_stage1's output
-        (or from a cross-function-mixed version of it)."""
+        (or from a cross-function-mixed version of it).
+
+        Args:
+            x: Intermediate decoder tensor.
+            global_correction: Global spectral correction tensor.
+
+        Returns:
+            Combined spectral prediction and an empty feature dictionary.
+        """
         x = self.up1(x); # feats["65"] = x
         x = self.up2(x); # feats["131"] = x
         x = self.up3(x); # feats["263"] = x
@@ -584,7 +942,15 @@ class SpectralDecoder5(nn.Module):
  
     def forward(self, z, return_features=True):
         """Kept intact for standalone use (e.g. testing/plotting a single
-        decoder in isolation, without cross-function mixing)."""
+        decoder in isolation, without cross-function mixing).
+
+        Args:
+            z: Encoded latent tensor.
+            return_features: Whether to return intermediate features.
+
+        Returns:
+            Prediction tensor, with intermediate features when requested.
+        """
         # x, feats = self.decode_stage1(z)
         x, global_correction = self.decode_stage1(z)
         out, feats = self.decode_stage2(x, global_correction)
@@ -605,6 +971,17 @@ DEFAULT_REGION_CONFIGS = [
 
 class EmulatorSet5(nn.Module):
     def __init__(self, encoder_type="single", wavelengths=None, region_configs=None):
+        """Initialize the EmulatorSet5 module.
+
+        Args:
+            self: Current model instance.
+            encoder_type: Encoder architecture variant.
+            wavelengths: Wavelength coordinates.
+            region_configs: Spectral region configuration for each transfer function.
+
+        Returns:
+            None. Initializes the module.
+        """
         super().__init__()
         if region_configs is None:
             self.region_configs = DEFAULT_REGION_CONFIGS
@@ -629,6 +1006,15 @@ class EmulatorSet5(nn.Module):
         self.function_mixer = FunctionMixer(globals.N_FUNCTIONS)
  
     def forward(self, x):
+        """Run the EmulatorSet5 forward computation.
+
+        Args:
+            self: Current model instance.
+            x: Input tensor or input collection.
+
+        Returns:
+            Prediction tensor and the corresponding intermediate feature outputs.
+        """
         if self.encoder_type == "single":
             z = self.encoder(x)
             zs = [z for _ in self.decoders]
@@ -658,17 +1044,51 @@ class EmulatorSet5(nn.Module):
 class InputHead6(nn.Module):
     """A minimal per-function input projection replacing Encoder5."""
     def __init__(self, in_dim, z_dim=28):
+        """Initialize the InputHead6 module.
+
+        Args:
+            self: Current model instance.
+            in_dim: Input feature dimension.
+            z_dim: Latent representation dimension.
+
+        Returns:
+            None. Initializes the module.
+        """
         super().__init__()
         self.proj = nn.Linear(in_dim, z_dim)
         self.act = nn.SiLU()
 
     def forward(self, x):
+        """Run the InputHead6 forward computation.
+
+        Args:
+            self: Current model instance.
+            x: Input tensor or input collection.
+
+        Returns:
+            Model output tensor.
+        """
         return self.act(self.proj(x))
 
 
 class SpectralDecoder6(nn.Module):
     """Set6 decoder: same spectral/output pipeline as Set5, with a wider stem."""
     def __init__(self, z_dim=28, channels=32, initial_length=32, spectrum_len=4205, n_global_modes=4, region_config=None, wavelengths=None):
+        """Initialize the SpectralDecoder6 module.
+
+        Args:
+            self: Current model instance.
+            z_dim: Latent representation dimension.
+            channels: Number of convolutional channels.
+            initial_length: Initial decoded sequence length.
+            spectrum_len: Output spectrum length.
+            n_global_modes: Number of global spectral modes.
+            region_config: Spectral region configuration for the decoder.
+            wavelengths: Wavelength coordinates.
+
+        Returns:
+            None. Initializes the module.
+        """
         super().__init__()
         self.fc = nn.Linear(z_dim, channels * initial_length)
         self.initial_length = initial_length
@@ -697,6 +1117,15 @@ class SpectralDecoder6(nn.Module):
         self.global_residual = GlobalSpectralResidual(z_dim, spectrum_len, n_modes=n_global_modes)
 
     def decode_stage1(self, z):
+        """Run the decode stage1 computation.
+
+        Args:
+            self: Current model instance.
+            z: Value used by this model component.
+
+        Returns:
+            Model output tensor.
+        """
         feats = {}
         x = self.fc(z).view(z.size(0), self.channels, self.initial_length)
         # feats["32"] = x
@@ -707,6 +1136,16 @@ class SpectralDecoder6(nn.Module):
         return x, global_correction #feats
 
     def decode_stage2(self, x, global_correction):
+        """Run the decode stage2 computation.
+
+        Args:
+            self: Current model instance.
+            x: Input tensor or input collection.
+            global_correction: Global spectral correction tensor.
+
+        Returns:
+            Model output tensor.
+        """
         x = self.up1(x); # feats["65"] = x
         x = self.up2(x); # feats["131"] = x
         x = self.up3(x); # feats["263"] = x
@@ -726,6 +1165,16 @@ class SpectralDecoder6(nn.Module):
 
     def forward(self, z, return_features=True):
         # x, feats = self.decode_stage1(z)
+        """Run the SpectralDecoder6 forward computation.
+
+        Args:
+            self: Current model instance.
+            z: Value used by this model component.
+            return_features: Whether to include intermediate features in the return value.
+
+        Returns:
+            Model output tensor.
+        """
         x, global_correction = self.decode_stage1(z)
         out, feats = self.decode_stage2(x, global_correction)
         if return_features:
@@ -737,6 +1186,19 @@ DEFAULT_INPUT_DIMS = [15, 9, 11, 8, 7, 9]
 class EmulatorSet6(nn.Module):
     """Six-function emulator with heterogeneous feature counts and no encoder."""
     def __init__(self, input_dims=None, z_dim=28, channels=32, wavelengths=None, region_configs=None):
+        """Initialize the EmulatorSet6 module.
+
+        Args:
+            self: Current model instance.
+            input_dims: Input feature dimensions, one per transfer function.
+            z_dim: Latent representation dimension.
+            channels: Number of convolutional channels.
+            wavelengths: Wavelength coordinates.
+            region_configs: Spectral region configuration for each transfer function.
+
+        Returns:
+            None. Initializes the module.
+        """
         super().__init__()
         self.input_dims = list(input_dims or DEFAULT_INPUT_DIMS)
         if len(self.input_dims) != globals.N_FUNCTIONS:
@@ -758,6 +1220,15 @@ class EmulatorSet6(nn.Module):
         self.function_mixer = FunctionMixer(globals.N_FUNCTIONS)
 
     def forward(self, x):
+        """Run the EmulatorSet6 forward computation.
+
+        Args:
+            self: Current model instance.
+            x: Input tensor or input collection.
+
+        Returns:
+            Prediction tensor and the corresponding intermediate feature outputs.
+        """
         if isinstance(x, dict):
             x = [x[i] for i in range(globals.N_FUNCTIONS)]
         if not isinstance(x, (list, tuple)) or len(x) != globals.N_FUNCTIONS:

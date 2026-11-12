@@ -49,6 +49,12 @@ def read_lut_header(file_path):
 
     NOTE: if your real readLUThdr.m parses additional metadata (variable
     names, units, ranges, etc. from HDF5 attributes), add that here too.
+
+    Args:
+        file_path: HDF5 file containing the ``/LUTheader`` dataset.
+
+    Returns:
+        Dictionary containing the floating-point ``LUTheader`` array.
     """
     with h5py.File(file_path, "r") as f:
         lutheader = np.asarray(f["/LUTheader"][()], dtype=float)
@@ -67,6 +73,12 @@ def myinterpn(*args):
     Below is a simple multivariate polynomial least-squares regression as
     a functional placeholder, matching the (fit) / (predict) call pattern.
     Replace with a direct port of your real myinterpn.m for correct results.
+
+    Args:
+        *args: Fit-mode or prediction-mode arguments described above.
+
+    Returns:
+        In fit mode, ``(None, coefficients)``; in prediction mode, predicted values.
     """
     if len(args) == 4:
         # Fit mode: myinterpn(X, Y, _, 'polyfit')
@@ -96,6 +108,14 @@ def myinterpn(*args):
 # Part 1: save test dataset inputs into a .csv file
 # --------------------------------------------------------------------------
 def save_test_inputs_to_csv(scenario="B"):
+    """Save the reference query inputs as a CSV file.
+
+    Args:
+        scenario: Scenario identifier used to locate the reference HDF5 file.
+
+    Returns:
+        The loaded input array written to the CSV file.
+    """
     file_path = f"{BASE_PATH}\\scenario{scenario}\\reference\\refInterp.h5"
     hdr = read_lut_header(file_path)
     X = hdr["LUTheader"]
@@ -111,6 +131,14 @@ def save_test_inputs_to_csv(scenario="B"):
 # Part 2: calculate baseline (polyfit) and emulator predictions
 # --------------------------------------------------------------------------
 def compute_baseline_predictions(scenario="A"):
+    """Fit the baseline polynomial model and predict at saved query inputs.
+
+    Args:
+        scenario: Scenario identifier used to locate training and reference files.
+
+    Returns:
+        Baseline predictions at the query inputs.
+    """
     # Training data
     train_file = f"{BASE_PATH}\\scenario{scenario}\\train\\train2000.h5"
     hdr = read_lut_header(train_file)

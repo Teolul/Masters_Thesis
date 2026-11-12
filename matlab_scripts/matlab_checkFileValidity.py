@@ -24,11 +24,13 @@ def check_file_validity(target_file: str, reference_file: str) -> bool:
       6. The reference file exists, also contains a 2-D "/LUTdata" dataset,
          and its second dimension matches the target file's second dimension.
 
-    Returns
-    -------
-    bool
-        True if every check passes, False otherwise (a message is printed
-        explaining the first failure encountered).
+    Args:
+        target_file: Submission HDF5 file to validate.
+        reference_file: Reference HDF5 file used to check spectral dimensions.
+
+    Returns:
+        True if every check passes, False otherwise. A message is printed
+        explaining the first failure encountered.
     """
 
     # 1. Target file must exist

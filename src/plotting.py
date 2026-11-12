@@ -125,6 +125,18 @@ def show_fit_val_summary(results_df, title="Results Summary", save_path="nn_save
 
 
     def _grouped_bars(ax, pivot, ylabel, title, factor=100):
+        """Draw grouped metric bars for each model and dataset size.
+
+        Args:
+            ax: Matplotlib axes receiving the bars.
+            pivot: Table of model values by dataset size.
+            ylabel: Label for the vertical axis.
+            title: Plot title.
+            factor: Multiplier applied to plotted values and annotations.
+
+        Returns:
+            None. Adds bars and labels to ``ax``.
+        """
         for i, mdl in enumerate(models):
             vals = pivot[mdl].values if mdl in pivot.columns else np.zeros(len(dataset_sizes))
             bars = ax.bar(x + offsets[i], vals, width, label=mdl,
@@ -284,6 +296,19 @@ def show_test_summary(results_df, title="Results Summary", save_path="nn_saves/n
 
 
     def _grouped_bars(ax, pivot, ylabel, title, factor=100, decimals=2):
+        """Draw grouped metric bars with formatted value labels.
+
+        Args:
+            ax: Matplotlib axes receiving the bars.
+            pivot: Table of model values by dataset size.
+            ylabel: Label for the vertical axis.
+            title: Plot title.
+            factor: Multiplier applied to plotted values and annotations.
+            decimals: Number of decimal places shown in value labels.
+
+        Returns:
+            None. Adds bars and labels to ``ax``.
+        """
         for i, mdl in enumerate(models):
             vals = pivot[mdl].values if mdl in pivot.columns else np.zeros(len(dataset_sizes))
             bars = ax.bar(x + offsets[i], vals, width, label=mdl,

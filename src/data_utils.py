@@ -2,8 +2,10 @@
 
 from pathlib import Path
 import h5py
+import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
+
 
 def inspect_metadata(path):
     """Print HDF5 metadata and return input and output names.
@@ -125,5 +127,33 @@ def train_val_test_split(X, Y, wavelengths, verbose=True):
         print("Y_test shape:", Y_test.shape)
     
     return X_tr, X_val, X_test, Y_tr, Y_val, Y_test
+
+
+def resample_reference_spectrum(reference_wavelengths, reference_values, wavelengths):
+    """Interpolate a reference spectrum onto the model wavelength grid.
+
+    Args:
+        reference_wavelengths: Wavelength values for the reference spectrum.
+        reference_values: Reference spectrum values corresponding to
+            ``reference_wavelengths``.
+        wavelengths: Target wavelength grid. The function flattens this array
+            before interpolation, matching the notebook implementation.
+
+    Returns:
+        Reference spectrum interpolated onto ``wavelengths``. Values outside
+        the reference range are NaN because extrapolation is disabled.
+    """
+    from scipy.interpolate import CubicSpline
+
+    spline = CubicSpline(reference_wavelengths, reference_values, extrapolate=False)
+    resampled = spline(wavelengths.flatten())
+
+    n_nan = np.isnan(resampled).sum()
+    if n_nan > 0:
+        print(f"Warning: {n_nan} wavelengths fell outside refldb range and became NaN")
+    else:
+        print(f"New shape: {resampled.shape}")
+
+    return resampled
 
 

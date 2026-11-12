@@ -3,11 +3,11 @@
 from pathlib import Path
 import random
 import re
-import os
 import copy
 import itertools
 import time
 import pickle
+import inspect
 from tqdm import tqdm
 from collections import defaultdict
 import pandas as pd
@@ -85,11 +85,87 @@ def nn_create_datasets(X_tr, X_val, Y_tr, Y_val, X_test, Y_test, verbose=True):
 
         # get item check
         x, y = train_ds.__getitem__(0)
-        print("Input shape:", x.shape)
+        if isinstance(x, (list, tuple)):
+            print("Input shapes:", [item.shape for item in x])
+        else:
+            print("Input shape:", x.shape)
         print("Output shape:", y.shape)
         print()
 
     return train_ds, val_ds, test_ds
+
+
+def nn_build_model(model_name, encoder_version, config, scale_type, device,
+                   wavelengths, region_configs=None):
+    """Create a registered model using the constructor options it supports.
+
+    Args:
+        model_name: Registered key from ``ARCHITECTURES``.
+        encoder_version: Encoder configuration for models that accept one.
+        config: Prepared experiment configuration containing fitted input scalers.
+        scale_type: Scaling configuration key used to select input scalers.
+        device: PyTorch device for the model.
+        wavelengths: Wavelength array passed to compatible model constructors.
+        region_configs: Optional spectral region configuration.
+
+    Returns:
+        The initialized model on ``device``.
+    """
+    if model_name not in ARCHITECTURES:
+        raise ValueError(f"Unknown model {model_name!r}. Choose from {list(ARCHITECTURES)}.")
+
+    model_class = ARCHITECTURES[model_name]
+    parameters = inspect.signature(model_class.__init__).parameters
+    options = {
+        "encoder_type": encoder_version,
+        "wavelengths": wavelengths,
+        "region_configs": region_configs,
+    }
+    if "input_dims" in parameters:
+        scalers = config["x_scalers"][scale_type]
+        if not isinstance(scalers, (list, tuple)):
+            raise ValueError(
+                f"{model_name} requires per-function feature inputs; prepare the selected-feature dataset first."
+            )
+        options["input_dims"] = [scaler.n_features_in_ for scaler in scalers]
+
+    model = model_class(**{name: value for name, value in options.items() if name in parameters})
+    return model.to(device)
+
+
+def nn_forward(model, inputs):
+    """Run a model and return its prediction tensor.
+
+    Args:
+        model: Initialized neural network model.
+        inputs: Batch input tensor or nested collection of tensors.
+
+    Returns:
+        Prediction tensor, discarding optional auxiliary model outputs.
+    """
+    outputs = model(inputs)
+    return outputs[0] if isinstance(outputs, tuple) else outputs
+
+
+def _move_batch_to_device(value, device):
+    """Move a tensor or a nested input collection to a PyTorch device.
+
+    Args:
+        value: Tensor, list, or tuple containing batch data.
+        device: Destination PyTorch device.
+
+    Returns:
+        The input structure with each tensor moved to ``device``.
+    """
+    if isinstance(value, torch.Tensor):
+        return value.to(device)
+    if isinstance(value, list):
+        return [_move_batch_to_device(item, device) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_move_batch_to_device(item, device) for item in value)
+    if isinstance(value, dict):
+        return {key: _move_batch_to_device(item, device) for key, item in value.items()}
+    return value
 
 
 def nn_prepare_all_experiments(X_tr, X_val, X_test, Y_tr, Y_val, Y_test, n_pca_components=10):
@@ -294,14 +370,9 @@ def nn_run_experiment(model_name, encoder_version, scale_type, config, device, w
     print(f"{'='*60}")
 
     # --- build model ---
-    ModelClass = ARCHITECTURES[model_name]
-    if model_name == "EmulatorSet5":
-        model = ModelClass(encoder_type=encoder_version, wavelengths=wavelengths, region_configs=region_configs).to(device)
-    elif model_name == "EmulatorSet6":
-        input_dims = [x.shape[0] for x in config["train_ds_scaled"][scale_type].__getitem__(0)[0]]
-        model = ModelClass(input_dims=input_dims, wavelengths=wavelengths, region_configs=region_configs).to(device)
-    else:
-        model = ModelClass(encoder_type=encoder_version).to(device)
+    model = nn_build_model(
+        model_name, encoder_version, config, scale_type, device, wavelengths, region_configs
+    )
 
     # --- data ---
     train_ds, val_ds, train_dl, val_dl, y_scalers, pca_list = nn_get_loaders_and_scalers(
@@ -334,24 +405,15 @@ def nn_run_experiment(model_name, encoder_version, scale_type, config, device, w
         all_targets = []
 
         for X_batch, Y_batch in tqdm(train_dl, desc=f"[{exp_id}] E{epoch+1} Train", leave=False):
-            if not isinstance(X_batch, list):
-                X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
-            else:
-                X_batch = [x.to(device) for x in X_batch]
-                Y_batch = Y_batch.to(device)
+            X_batch = _move_batch_to_device(X_batch, device)
+            Y_batch = Y_batch.to(device)
             optimizer.zero_grad()
-            if model_name == "EmulatorSet5" or model_name == "EmulatorSet6":
-                y_pred, _ = model(X_batch)
-            else:
-                y_pred = model(X_batch)
+            y_pred = nn_forward(model, X_batch)
             loss   = criterion(y_pred, Y_batch)
             loss.backward()
             optimizer.step()
 
-            if model_name != "EmulatorSet6":
-                epoch_train_loss += loss.item() * X_batch.size(0)
-            else:
-                epoch_train_loss += loss.item() * X_batch[0].size(0)
+            epoch_train_loss += loss.item() * Y_batch.size(0)
             all_preds.append(y_pred.detach().cpu())
             all_targets.append(Y_batch.cpu())
 
@@ -368,21 +430,12 @@ def nn_run_experiment(model_name, encoder_version, scale_type, config, device, w
 
         with torch.no_grad():
             for X_batch, Y_batch in tqdm(val_dl, desc=f"[{exp_id}] E{epoch+1} Val", leave=False):
-                if not isinstance(X_batch, list):
-                    X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
-                else:
-                    X_batch = [x.to(device) for x in X_batch]
-                    Y_batch = Y_batch.to(device)
-                if model_name == "EmulatorSet5" or model_name == "EmulatorSet6":
-                    y_pred, _ = model(X_batch)
-                else:
-                    y_pred = model(X_batch)
+                X_batch = _move_batch_to_device(X_batch, device)
+                Y_batch = Y_batch.to(device)
+                y_pred = nn_forward(model, X_batch)
                 loss   = criterion(y_pred, Y_batch)
 
-                if model_name != "EmulatorSet6":
-                    epoch_val_loss += loss.item() * X_batch.size(0)
-                else:
-                    epoch_val_loss += loss.item() * X_batch[0].size(0)
+                epoch_val_loss += loss.item() * Y_batch.size(0)
                 all_preds.append(y_pred.cpu())
                 all_targets.append(Y_batch.cpu())
 
@@ -426,19 +479,22 @@ def nn_run_experiment(model_name, encoder_version, scale_type, config, device, w
     model.load_state_dict(best_model_wts)
 
     # persist model
-    os.makedirs("nn_saves", exist_ok=True)
+    nn_save_dir = globals.NN_RESULTS_ROOT
     if seed == 42:
-        torch.save(model.state_dict(), f"nn_saves/model_saves/{exp_id}.pth")
+        model_path = nn_save_dir / "models" / f"{exp_id}.pth"
     else:
-        torch.save(model.state_dict(), f"nn_saves/model_saves_uncertainty/{exp_id}_{seed}.pth")
+        model_path = nn_save_dir / "ensemble_models" / f"{exp_id}_{seed}.pth"
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(model.state_dict(), model_path)
 
     # save history
     if seed == 42:
-        with open(f"nn_saves/model_saves/{exp_id}_history.pkl", "wb") as f:
-            pickle.dump(history, f)
+        history_path = nn_save_dir / "histories" / f"{exp_id}_history.pkl"
     else:
-        with open(f"nn_saves/model_saves_uncertainty/{exp_id}_{seed}_history.pkl", "wb") as f:
-            pickle.dump(history, f)
+        history_path = nn_save_dir / "histories" / f"{exp_id}_{seed}_history.pkl"
+    history_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(history_path, "wb") as f:
+        pickle.dump(history, f)
 
     # build result row
     idx_best = int(np.argmin(history["val_mre"]))
@@ -461,7 +517,8 @@ def nn_run_experiment(model_name, encoder_version, scale_type, config, device, w
 
 
 # ==================== FULL EXPERIMENT LOOP ====================
-def nn_run_all_experiments(config, device, wavelengths, region_configs=None, seed=42):
+def nn_run_all_experiments(config, device, wavelengths, region_configs=None, seed=42,
+                           model_names=None, encoder_versions=None, scale_types=None):
     """Run the configured model, encoder, and scaling combinations.
 
     Args:
@@ -470,6 +527,9 @@ def nn_run_all_experiments(config, device, wavelengths, region_configs=None, see
         wavelengths: Wavelength array used for evaluation and model setup.
         region_configs: Optional spectral region configuration for supported models.
         seed: Random seed used by each experiment.
+        model_names: Optional subset of registered model names to run.
+        encoder_versions: Optional subset of encoder versions to run.
+        scale_types: Optional subset of scaling configurations to run.
 
     Returns:
         A sorted results dataframe, the last successfully assigned model, and
@@ -477,12 +537,21 @@ def nn_run_all_experiments(config, device, wavelengths, region_configs=None, see
     """
 
     if seed == 42:
-        results_path = Path("nn_saves/validation_results/nn_val_results.csv")
+        results_path = globals.NN_RESULTS_ROOT / "validation" / "nn_val_results.csv"
     else:
-        results_path = Path("nn_saves/validation_results/nn_val_results_uncertainty.csv")
+        results_path = globals.NN_RESULTS_ROOT / "validation" / "nn_val_results_uncertainty.csv"
+    results_path.parent.mkdir(parents=True, exist_ok=True)
     all_results  = []
 
-    grid = list(itertools.product(ARCHITECTURES.keys(), ENCODER_VERSIONS, SCALE_TYPES))
+    selected_models = list(ARCHITECTURES) if model_names is None else list(model_names)
+    selected_encoders = ENCODER_VERSIONS if encoder_versions is None else list(encoder_versions)
+    selected_scales = SCALE_TYPES if scale_types is None else list(scale_types)
+    if not selected_models or not selected_encoders or not selected_scales:
+        raise ValueError("Select at least one model, encoder version, and scale type.")
+    unknown_models = set(selected_models) - set(ARCHITECTURES)
+    if unknown_models:
+        raise ValueError(f"Unknown model names: {sorted(unknown_models)}")
+    grid = list(itertools.product(selected_models, selected_encoders, selected_scales))
     print(f"Total experiments to run: {len(grid)}")
 
     for model_name, encoder_version, scale_type in grid:

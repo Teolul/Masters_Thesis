@@ -43,7 +43,15 @@ BASE_PATH = r"C:\Users\Matteo\Desktop\Scuola\MastersThesis\AMLEC-1\rtm_emulation
 
 
 def read_lutdata(file_path, dataset="/LUTdata"):
-    """Read a dataset from an HDF5 file (equivalent to MATLAB's h5read)."""
+    """Read a dataset from an HDF5 file (equivalent to MATLAB's h5read).
+
+    Args:
+        file_path: HDF5 file to read.
+        dataset: HDF5 dataset path.
+
+    Returns:
+        Dataset contents as a floating-point NumPy array.
+    """
     with h5py.File(file_path, "r") as f:
         return np.asarray(f[dataset][()], dtype=float)
 
@@ -57,6 +65,15 @@ def retrieve_reflectance(Ltoa, Y, sza, n):
     TOA radiance `Ltoa` given the emulated transfer functions `Y`.
 
     Y is stacked as 6 blocks of n rows each: [L0; E_direct; E_diffuse; Sa; T1; T2]
+
+    Args:
+        Ltoa: Top-of-atmosphere radiance values.
+        Y: Stacked atmospheric transfer functions.
+        sza: Solar zenith angle in degrees.
+        n: Number of wavelength samples in each transfer-function block.
+
+    Returns:
+        Retrieved surface reflectance array.
     """
     L0 = Y[0:n, :]
     E = Y[n:2 * n, :] * np.cos(np.deg2rad(sza)) + Y[2 * n:3 * n, :]
@@ -71,6 +88,15 @@ def toa_radiance(rho, Y, sza, n):
     """
     Forward-simulate TOA radiance from a known surface reflectance `rho`
     given the emulated transfer functions `Y`.
+
+    Args:
+        rho: Surface reflectance values.
+        Y: Stacked atmospheric transfer functions.
+        sza: Solar zenith angle in degrees.
+        n: Number of wavelength samples in each transfer-function block.
+
+    Returns:
+        Simulated top-of-atmosphere radiance array.
     """
     L0 = Y[0:n, :]
     E = Y[n:2 * n, :] * np.cos(np.deg2rad(sza)) + Y[2 * n:3 * n, :]
@@ -82,7 +108,16 @@ def toa_radiance(rho, Y, sza, n):
 
 
 def error_metric_A(rho_ref, rho_ret, wvl):
-    """Mean relative error (%) in retrieved surface reflectance, scenario A."""
+    """Mean relative error (%) in retrieved surface reflectance, scenario A.
+
+    Args:
+        rho_ref: Reference surface reflectance array.
+        rho_ret: Retrieved surface reflectance array.
+        wvl: Wavelength coordinates used to exclude absorption bands.
+
+    Returns:
+        Mean relative error percentage over included wavelengths and samples.
+    """
     re = 100 * np.abs(rho_ret - rho_ref) / rho_ref
     re = np.nanmean(re, axis=1)  # average over samples
 
@@ -98,7 +133,15 @@ def error_metric_A(rho_ref, rho_ret, wvl):
 
 
 def error_metric_B(Ltoa_ref, Ltoa_ret):
-    """Mean relative error (%) in simulated TOA radiance, scenario B."""
+    """Mean relative error (%) in simulated TOA radiance, scenario B.
+
+    Args:
+        Ltoa_ref: Reference top-of-atmosphere radiance array.
+        Ltoa_ret: Simulated top-of-atmosphere radiance array.
+
+    Returns:
+        Mean relative error percentage over wavelengths and samples.
+    """
     re = 100 * np.abs(Ltoa_ref - Ltoa_ret) / Ltoa_ref
     re = np.nanmean(re, axis=1)  # average over samples
     return np.nanmean(re)  # spectral average
@@ -109,6 +152,12 @@ def compute_final_ranks(rnk):
     Compute the weighted average ranking and the standard competition
     ranking ("1224" style: ties share the lowest rank, next rank skips
     accordingly) for a given ranking matrix.
+
+    Args:
+        rnk: Per-scenario and per-track ranks, with four columns.
+
+    Returns:
+        Weighted average rank and standard competition rank for each model.
 
     Parameters
     ----------
@@ -152,6 +201,12 @@ def rank_columnwise(values):
     Equivalent of MATLAB's `[~, idx] = sort(x); [~, rnk] = sort(idx);` trick,
     which converts values into 1-based ranks (NaNs are sorted last by
     default in both MATLAB and NumPy).
+
+    Args:
+        values: One-dimensional values to rank.
+
+    Returns:
+        One-based rank for each input value.
     """
     order = np.argsort(values, kind="stable")
     ranks = np.argsort(order, kind="stable") + 1
@@ -162,6 +217,14 @@ def rank_columnwise(values):
 # Main evaluation
 # --------------------------------------------------------------------------
 def main():
+    """Evaluate submitted models and compute their final rankings.
+
+    Args:
+        None.
+
+    Returns:
+        None. Prints evaluation progress and ranking results.
+    """
     # Find how many .h5 submission files we have, and how many distinct models
     h5_files = glob.glob(os.path.join(BASE_PATH, "*.h5"))
     file_names = [os.path.basename(f) for f in h5_files]

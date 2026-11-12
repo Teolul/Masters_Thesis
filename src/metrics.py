@@ -3,19 +3,21 @@
 import numpy as np
 
 def retrieve_reflectance(Ltoa: np.ndarray, Y_pred: np.ndarray, sza: np.ndarray, n_wvl: int) -> np.ndarray:
-    """
-    Performs atmospheric correction to retrieve surface reflectance.
-    Calculates surface reflectance ($\rho$) from Top-Of-Atmosphere (TOA) radiance
-    using the provided transfer functions.
+    """Retrieve surface reflectance from TOA radiance and transfer functions.
+
+    Calculates surface reflectance ($\rho$) from Top-Of-Atmosphere (TOA)
+    radiance using the provided transfer functions.
 
     Args:
-        Ltoa (np.ndarray): TOA radiance, shape [n_wvl, n_samples].
-        Y_pred (np.ndarray): Predicted transfer-function blocks, shape [6*n_wvl, n_samples].
-        sza (np.ndarray): Solar zenith angle in degrees, shape [1, 1].
-        n_wvl (int): Number of spectral wavelengths.
+        Ltoa: TOA radiance with shape ``(n_samples, n_wvl)``.
+        Y_pred: Predicted transfer-function blocks with shape
+            ``(n_samples, 6 * n_wvl)``.
+        sza: Solar zenith angle in degrees, broadcast-compatible with the
+            sample axis.
+        n_wvl: Number of spectral wavelengths.
 
     Returns:
-        np.ndarray: Surface reflectance ($\rho$), shape [n_wvl, n_samples].
+        Surface reflectance with shape ``(n_samples, n_wvl)``.
     """
     # split transfer-function data
     L0 = Y_pred[:, 0:n_wvl]
@@ -39,19 +41,18 @@ def retrieve_reflectance(Ltoa: np.ndarray, Y_pred: np.ndarray, sza: np.ndarray, 
 
 
 def mre_amlec(rho_ref: np.ndarray, rho_ret: np.ndarray, wvl: np.ndarray, axis: int | None = None) -> float | np.ndarray:
-    """
-    Computes the error metric for Scenario A (Atmospheric Correction).
-    Calculates Mean Relative Error (MRE) excluding specific absorption bands.
-    
+    """Calculate Scenario A MRE with the established absorption-band handling.
+
     Args:
-        rho_ref (np.ndarray): Reference reflectance, shape [n_wvl].
-        rho_ret (np.ndarray): Retrieved reflectance, shape [n_samples, n_wvl].
-        wvl (np.ndarray): Wavelengths, shape [1, n_wvl].
-        axis: None -> global scalar
-              1    -> per wavelength
+        rho_ref: Reference reflectance with shape ``(n_wvl,)``.
+        rho_ret: Retrieved reflectance with shape ``(n_samples, n_wvl)``.
+        wvl: Wavelengths with shape ``(1, n_wvl)``.
+        axis: ``None`` for the global mean or ``1`` for per-wavelength values.
+            The absorption-band mask is applied to the global mean only.
 
     Returns:
-        float or np.ndarray: Mean relative error in percentage.
+        Mean relative error as a fraction (not multiplied by 100), or an array
+        of per-wavelength values when ``axis=1``.
     """
     re = np.abs(rho_ret - rho_ref) / rho_ref
 
@@ -68,23 +69,22 @@ def mre_amlec(rho_ref: np.ndarray, rho_ret: np.ndarray, wvl: np.ndarray, axis: i
     elif axis == 1:
         return np.nanmean(re, axis=0)
     else:
-        raise ValueError("Invalid axis value. Must be None, 0, 1, or 2.")
+        raise ValueError("Invalid axis value. Must be None or 1.")
 
 
 def mae_amlec(rho_ref: np.ndarray, rho_ret: np.ndarray, wvl: np.ndarray, axis: int | None = None) -> float | np.ndarray:
-    """
-    Computes the MAE counterpart of the Scenario A (Atmospheric Correction) error metric.
-    Calculates Mean Absolute Error (MAE) excluding specific absorption bands.
-    
+    """Calculate Scenario A MAE with the established absorption-band handling.
+
     Args:
-        rho_ref (np.ndarray): Reference reflectance, shape [n_wvl].
-        rho_ret (np.ndarray): Retrieved reflectance, shape [n_samples, n_wvl].
-        wvl (np.ndarray): Wavelengths, shape [1, n_wvl].
-        axis: None -> global scalar
-              1    -> per wavelength
+        rho_ref: Reference reflectance with shape ``(n_wvl,)``.
+        rho_ret: Retrieved reflectance with shape ``(n_samples, n_wvl)``.
+        wvl: Wavelengths with shape ``(1, n_wvl)``.
+        axis: ``None`` for the global mean or ``1`` for per-wavelength values.
+            The absorption-band mask is applied to the global mean only.
 
     Returns:
-        float or np.ndarray: Mean absolute error.
+        Mean absolute error or an array of per-wavelength values when
+        ``axis=1``.
     """
     ae = np.abs(rho_ret - rho_ref)
 
@@ -101,23 +101,25 @@ def mae_amlec(rho_ref: np.ndarray, rho_ret: np.ndarray, wvl: np.ndarray, axis: i
     elif axis == 1:
         return np.nanmean(ae, axis=0)
     else:
-        raise ValueError("Invalid axis value. Must be None, 0, 1, or 2.")
+        raise ValueError("Invalid axis value. Must be None or 1.")
 
 
 def propagate_reflectance_uncertainty(Ltoa, Y_pred, Y_std, sza, n_wvl):
-    """
-    Analytical (delta-method) propagation of transfer-function uncertainty
-    into reflectance uncertainty, assuming independence between the six functions.
+    """Propagate transfer-function uncertainty into reflectance uncertainty.
+
+    Uses analytical delta-method propagation, assuming independence between
+    the six transfer functions.
 
     Args:
-        Ltoa: (n_samples, n_wvl)
-        Y_pred: (n_samples, 6*n_wvl) predicted transfer-function means
-        Y_std:  (n_samples, 6*n_wvl) predicted transfer-function std devs (same layout as Y_pred)
-        sza: (n_samples, 1)
-        n_wvl: int
+        Ltoa: TOA radiance with shape ``(n_samples, n_wvl)``.
+        Y_pred: Predicted transfer-function means with shape
+            ``(n_samples, 6 * n_wvl)``.
+        Y_std: Predicted standard deviations in the same layout as ``Y_pred``.
+        sza: Solar zenith angles with shape ``(n_samples, 1)``.
+        n_wvl: Number of wavelengths.
 
     Returns:
-        rho_std: (n_samples, n_wvl)
+        Reflectance standard deviations with shape ``(n_samples, n_wvl)``.
     """
     L0    = Y_pred[:, 0:n_wvl]
     Edir  = Y_pred[:, n_wvl:2*n_wvl]
@@ -181,14 +183,16 @@ def build_mask(wavelengths):
 
 
 def mre_score(y_true, y_pred, wavelengths, axis=None, epsilon=1e-8):
-    """Calculate mean relative error over the selected wavelengths and axes.
+    """Calculate mean relative error using the function's axis-specific aggregation.
 
     Args:
         y_true: Reference values.
         y_pred: Predicted values matching ``y_true``.
         wavelengths: Wavelength array used to construct the evaluation mask.
         axis: Aggregation mode: ``None`` for a global scalar, ``2`` per function,
-            ``1`` per wavelength, or ``0`` per function and wavelength.
+            ``1`` per wavelength, or ``0`` per function and wavelength. The
+            wavelength exclusion mask is applied for ``None`` and ``2`` only;
+            the ``1`` and ``0`` branches include all wavelengths.
         epsilon: Small constant added to the absolute reference values.
 
     Returns:
@@ -223,14 +227,16 @@ def mre_score(y_true, y_pred, wavelengths, axis=None, epsilon=1e-8):
 
 
 def mae_score(y_true, y_pred, wavelengths, axis=None):
-    """Calculate mean absolute error over the selected wavelengths and axes.
+    """Calculate mean absolute error using the function's axis-specific aggregation.
 
     Args:
         y_true: Reference values.
         y_pred: Predicted values matching ``y_true``.
         wavelengths: Wavelength array used to construct the evaluation mask.
         axis: Aggregation mode: ``None`` for a global scalar, ``2`` per function,
-            ``1`` per wavelength, or ``0`` per function and wavelength.
+            ``1`` per wavelength, or ``0`` per function and wavelength. The
+            wavelength exclusion mask is applied for ``None`` and ``2`` only;
+            the ``1`` and ``0`` branches include all wavelengths.
 
     Returns:
         MAE as a scalar or array according to ``axis``.
