@@ -41,7 +41,13 @@ from plotting import (
     show_residuals_reflectance,
     show_multiple_experiments_errors,
 )
-from gp_utils import inverse_mean_transform, inverse_std_transform
+from gp_utils import (
+    inverse_mean_transform,
+    inverse_std_transform,
+    gp_predict_per_function,
+    gp_predict_components,
+    gp_predict_combined,
+)
 from nn_experiments import (
     ARCHITECTURES,
     ENCODER_VERSIONS,
@@ -59,4 +65,11 @@ from nn_experiments import (
     nn_forward,
     nn_run_experiment,
     nn_run_all_experiments,
+)
+from nn_evaluation import (
+    nn_load_model,
+    nn_predict,
+    nn_test_model,
+    nn_load_ensemble,
+    nn_ensemble_predict,
 )
